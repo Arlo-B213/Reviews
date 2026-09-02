@@ -158,6 +158,33 @@
           <button class="rt-submit" id="rt-submit">Add review</button>
         </div>
 
+        <div class="rt-form">
+          <h2>Bulk add — paste multiple reviews</h2>
+          <p class="rt-meta" style="margin: 0 0 10px;">Copy rows straight from an Excel tab in this order: Date, Rating, Reviewer, Comments. Paste them below, one review per line — all will use the outlet and source picked here.</p>
+          <div class="rt-row">
+            <div class="rt-field">
+              <label for="rt-bulk-outlet">Outlet</label>
+              <select id="rt-bulk-outlet"></select>
+            </div>
+            <div class="rt-field">
+              <label for="rt-bulk-source">Source</label>
+              <select id="rt-bulk-source">
+                <option value="Yelp">Yelp</option>
+                <option value="Google">Google</option>
+                <option value="TripAdvisor">TripAdvisor</option>
+              </select>
+            </div>
+          </div>
+          <div class="rt-field" style="margin-bottom: 6px;">
+            <label for="rt-bulk-text">Pasted rows</label>
+            <textarea id="rt-bulk-text" style="min-height: 110px;" placeholder="8/31/2026&#9;4.5&#9;Jamie R.&#9;Fast service, friendly staff.
+8/29/2026&#9;3&#9;Alex T.&#9;Line was long at lunch."></textarea>
+          </div>
+          <div class="rt-error" id="rt-bulk-error"></div>
+          <div class="rt-meta" id="rt-bulk-result" style="margin-bottom: 8px;"></div>
+          <button class="rt-submit" id="rt-bulk-submit">Add all pasted rows</button>
+        </div>
+
         <div class="rt-list-head">
           <h2 id="rt-list-title">All reviews</h2>
           <button class="rt-refresh" id="rt-refresh">Refresh</button>
@@ -209,7 +236,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import {
-    getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp
+    getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
   // ---- EDIT THESE to change the shared passcodes ----
@@ -250,6 +277,24 @@
     var m = String(d.getMonth() + 1).padStart(2, "0");
     var day = String(d.getDate()).padStart(2, "0");
     return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  // Accepts "8/31/2026", "08/31/2026", or "2026-08-31" and returns "yyyy-mm-dd", or null if unparseable.
+  function parseDateFlexible(raw) {
+    if (!raw) return null;
+    raw = raw.trim();
+    var iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(raw);
+    if (iso) {
+      return iso[1] + "-" + iso[2].padStart(2, "0") + "-" + iso[3].padStart(2, "0");
+    }
+    var us = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(raw);
+    if (us) {
+      var mm = us[1].padStart(2, "0");
+      var dd = us[2].padStart(2, "0");
+      var yyyy = us[3].length === 2 ? "20" + us[3] : us[3];
+      return yyyy + "-" + mm + "-" + dd;
+    }
+    return null;
   }
 
   // ---- Passcode gate ----
@@ -328,6 +373,18 @@
     } else {
       el("rt-outlet-row").style.display = "grid";
     }
+
+    var bulkSel = el("rt-bulk-outlet");
+    if (bulkSel && !bulkSel.dataset.filled) {
+      OUTLETS.forEach(function (o) {
+        var opt = document.createElement("option");
+        opt.value = o;
+        opt.textContent = o;
+        bulkSel.appendChild(opt);
+      });
+      bulkSel.dataset.filled = "1";
+    }
+    if (bulkSel && currentTab !== "All") bulkSel.value = currentTab;
   }
 
   function filtered() {
@@ -527,6 +584,7 @@
 
     if (role === "editor") {
       el("rt-submit").addEventListener("click", addReview);
+      el("rt-bulk-submit").addEventListener("click", addBulkReviews);
       el("rt-refresh").addEventListener("click", function () { el("rt-live-text").textContent = "Live"; });
     }
   }
@@ -567,6 +625,73 @@
     el("rt-reviewer").value = "";
     el("rt-comment").value = "";
     el("rt-date").value = todayStr();
+  }
+
+  async function addBulkReviews() {
+    var outlet = el("rt-bulk-outlet").value;
+    var source = el("rt-bulk-source").value;
+    var raw = el("rt-bulk-text").value;
+    var errorEl = el("rt-bulk-error");
+    var resultEl = el("rt-bulk-result");
+    errorEl.textContent = "";
+    resultEl.textContent = "";
+
+    var lines = raw.split("\n").map(function (l) { return l.replace(/\r$/, ""); }).filter(function (l) { return l.trim().length > 0; });
+    if (!lines.length) {
+      errorEl.textContent = "Paste at least one row first.";
+      return;
+    }
+
+    var rows = [];
+    var skipped = [];
+    lines.forEach(function (line, i) {
+      var parts = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
+      parts = parts.map(function (p) { return p.trim(); });
+      if (parts.length < 2) {
+        skipped.push(i + 1);
+        return;
+      }
+      var dateVal = parseDateFlexible(parts[0]) || todayStr();
+      var ratingVal = Number(parts[1]);
+      if (parts[1] === "" || isNaN(ratingVal) || ratingVal < 0 || ratingVal > 5) {
+        skipped.push(i + 1);
+        return;
+      }
+      var reviewer = parts[2] || "";
+      var comment = parts.slice(3).join(", ") || "";
+      rows.push({ date: dateVal, rating: ratingVal, reviewer: reviewer, comment: comment });
+    });
+
+    if (!rows.length) {
+      errorEl.textContent = "Couldn't read any valid rows. Check that each line has at least a date and a rating (0–5).";
+      return;
+    }
+
+    try {
+      var batch = writeBatch(db);
+      rows.forEach(function (row, i) {
+        var ref = doc(reviewsCol);
+        batch.set(ref, {
+          outlet: outlet,
+          source: source,
+          date: row.date,
+          rating: row.rating,
+          reviewer: row.reviewer,
+          comment: row.comment,
+          createdAtMs: Date.now() + i,
+          createdAt: serverTimestamp()
+        });
+      });
+      await batch.commit();
+    } catch (e) {
+      errorEl.textContent = "Could not save. Check your connection and try again.";
+      console.error(e);
+      return;
+    }
+
+    el("rt-bulk-text").value = "";
+    resultEl.textContent = "Added " + rows.length + (rows.length === 1 ? " review" : " reviews") +
+      (skipped.length ? "; skipped " + skipped.length + " row" + (skipped.length === 1 ? "" : "s") + " (line " + skipped.join(", ") + ") — missing or invalid rating." : ".");
   }
 
   async function deleteReview(id) {
