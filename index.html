@@ -54,6 +54,7 @@
     padding: 9px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
   .rt-submit:hover { background: var(--navy-light); }
   .rt-submit:active { transform: scale(0.98); }
+  .rt-submit:disabled { opacity: 0.5; cursor: default; }
   .rt-list-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .rt-list-head h2 { font-size: 14px; color: var(--navy); margin: 0; font-weight: 600; }
   .rt-refresh { background: none; border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; font-size: 12px; color: var(--muted); cursor: pointer; }
@@ -92,13 +93,15 @@
   @media (max-width: 560px) { .rt-charts { grid-template-columns: 1fr; } }
   .rt-segment-low h2 { color: var(--danger); }
   .rt-segment-high h2 { color: var(--green); }
-  .rt-parsed-card { background: var(--cream); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
-  .rt-parsed-top { display: grid; grid-template-columns: 1.4fr 1fr 0.8fr; gap: 8px; margin-bottom: 6px; }
-  .rt-parsed-top input { font-size: 13px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
-  .rt-parsed-comment { width: 100%; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; resize: vertical; min-height: 44px; font-family: inherit; }
-  .rt-parsed-remove { background: none; border: none; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; padding: 0; margin-top: 4px; }
-  .rt-parsed-remove:hover { color: var(--danger); }
-  @media (max-width: 480px) { .rt-parsed-top { grid-template-columns: 1fr; } }
+
+  /* CSV upload */
+  .rt-csv-file-row { display: flex; align-items: center; gap: 10px; background: var(--cream); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; flex-wrap: wrap; }
+  .rt-csv-file-name { font-size: 12.5px; font-weight: 600; color: var(--ink); flex: 1 1 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rt-csv-file-count { font-size: 11.5px; color: var(--muted); }
+  .rt-csv-file-row select { font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .rt-csv-file-remove { background: none; border: none; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; }
+  .rt-csv-file-remove:hover { color: var(--danger); }
+  input[type="file"] { font-size: 12.5px; }
 </style>
 
 <div class="rt-app">
@@ -166,59 +169,24 @@
         </div>
 
         <div class="rt-form">
-          <h2>Paste from Yelp / Google</h2>
-          <p class="rt-meta" style="margin: 0 0 10px;">Select and copy a review straight off the site — name, date, photo links and all — and paste the raw text below. It works for one review or several pasted together. You'll just need to fill in the star rating for each, since that isn't in the copied text.</p>
-          <div class="rt-row">
-            <div class="rt-field">
-              <label for="rt-paste-outlet">Outlet</label>
-              <select id="rt-paste-outlet"></select>
-            </div>
-            <div class="rt-field">
-              <label for="rt-paste-source">Source</label>
-              <select id="rt-paste-source">
-                <option value="Yelp">Yelp</option>
-                <option value="Google">Google</option>
-                <option value="TripAdvisor">TripAdvisor</option>
-              </select>
-            </div>
+          <h2>Upload review CSVs</h2>
+          <p class="rt-meta" style="margin: 0 0 10px;">Upload one or more exported review CSVs (columns like Review Rating, Review Text, Review Date, Review Author). Select all your outlet files at once — the outlet is guessed from each filename, so check the dropdowns before importing.</p>
+          <div class="rt-field">
+            <label for="rt-csv-source">Source (applies to all files)</label>
+            <select id="rt-csv-source">
+              <option value="Yelp">Yelp</option>
+              <option value="Google">Google</option>
+              <option value="TripAdvisor">TripAdvisor</option>
+            </select>
           </div>
-          <div class="rt-field" style="margin-bottom: 6px;">
-            <label for="rt-paste-text">Pasted review text</label>
-            <textarea id="rt-paste-text" style="min-height: 110px;" placeholder="Paste the copied review block(s) here..."></textarea>
+          <div class="rt-field">
+            <label for="rt-csv-input">CSV files</label>
+            <input type="file" id="rt-csv-input" accept=".csv" multiple />
           </div>
-          <div class="rt-error" id="rt-paste-error"></div>
-          <button class="rt-submit" id="rt-paste-parse">Parse pasted text</button>
-
-          <div id="rt-parsed-list" style="margin-top: 14px;"></div>
-          <button class="rt-submit rt-hidden" id="rt-paste-submit" style="margin-top: 10px;">Add reviews</button>
-          <div class="rt-meta" id="rt-paste-result" style="margin-top: 8px;"></div>
-        </div>
-
-        <div class="rt-form">
-          <h2>Bulk add — paste multiple reviews</h2>
-          <p class="rt-meta" style="margin: 0 0 10px;">Copy rows straight from an Excel tab in this order: Date, Rating, Reviewer, Comments. Paste them below, one review per line — all will use the outlet and source picked here.</p>
-          <div class="rt-row">
-            <div class="rt-field">
-              <label for="rt-bulk-outlet">Outlet</label>
-              <select id="rt-bulk-outlet"></select>
-            </div>
-            <div class="rt-field">
-              <label for="rt-bulk-source">Source</label>
-              <select id="rt-bulk-source">
-                <option value="Yelp">Yelp</option>
-                <option value="Google">Google</option>
-                <option value="TripAdvisor">TripAdvisor</option>
-              </select>
-            </div>
-          </div>
-          <div class="rt-field" style="margin-bottom: 6px;">
-            <label for="rt-bulk-text">Pasted rows</label>
-            <textarea id="rt-bulk-text" style="min-height: 110px;" placeholder="8/31/2026&#9;4.5&#9;Jamie R.&#9;Fast service, friendly staff.
-8/29/2026&#9;3&#9;Alex T.&#9;Line was long at lunch."></textarea>
-          </div>
-          <div class="rt-error" id="rt-bulk-error"></div>
-          <div class="rt-meta" id="rt-bulk-result" style="margin-bottom: 8px;"></div>
-          <button class="rt-submit" id="rt-bulk-submit">Add all pasted rows</button>
+          <div id="rt-csv-file-list"></div>
+          <div class="rt-error" id="rt-csv-error"></div>
+          <div class="rt-meta" id="rt-csv-result" style="margin-bottom: 8px;"></div>
+          <button class="rt-submit rt-hidden" id="rt-csv-submit">Import all files</button>
         </div>
 
         <div class="rt-list-head">
@@ -269,6 +237,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import {
@@ -301,9 +270,19 @@
   var HIGH_THRESHOLD = 4.5;
   var SEGMENT_LIMIT = 10;
 
+  // Guess an outlet from a filename's leading letters, e.g. "PFC_export.csv" -> Pechanga Fried Chicken
+  var FILENAME_OUTLET_MAP = [
+    { pattern: /^cafe|cocoa/i, outlet: "Cafe Cocoa's" },
+    { pattern: /^lw|little.?wok/i, outlet: "Little Wok" },
+    { pattern: /^pfc|fried.?chicken/i, outlet: "Pechanga Fried Chicken" },
+    { pattern: /^pr\b|pronto/i, outlet: "Pronto" },
+    { pattern: /^ac\b|american/i, outlet: "American Classics" },
+    { pattern: /^ag\b|agave/i, outlet: "Agave" }
+  ];
+
   var currentTab = "All";
   var reviews = [];
-  var parsedRows = [];
+  var csvFiles = []; // { name, outlet, rows: [{date, rating, reviewer, comment}], error }
   var ratingChart = null;
   var sourceChart = null;
 
@@ -316,14 +295,14 @@
     return d.getFullYear() + "-" + m + "-" + day;
   }
 
-  // Accepts "8/31/2026", "08/31/2026", "2026-08-31", or "Aug 29, 2026" and returns "yyyy-mm-dd", or null if unparseable.
+  // Accepts "8/31/2026", "08/31/2026", "2026-08-31", "Aug 29, 2026", or an ISO datetime, returns "yyyy-mm-dd".
   function parseDateFlexible(raw) {
     if (!raw) return null;
     raw = raw.trim();
+    var isoDateTime = /^(\d{4})-(\d{2})-(\d{2})T/.exec(raw);
+    if (isoDateTime) return isoDateTime[1] + "-" + isoDateTime[2] + "-" + isoDateTime[3];
     var iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(raw);
-    if (iso) {
-      return iso[1] + "-" + iso[2].padStart(2, "0") + "-" + iso[3].padStart(2, "0");
-    }
+    if (iso) return iso[1] + "-" + iso[2].padStart(2, "0") + "-" + iso[3].padStart(2, "0");
     var us = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(raw);
     if (us) {
       var mm = us[1].padStart(2, "0");
@@ -335,58 +314,17 @@
     var named = /^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/.exec(raw);
     if (named) {
       var key = named[1].slice(0, 3).toLowerCase();
-      if (months[key]) {
-        return named[3] + "-" + months[key] + "-" + named[2].padStart(2, "0");
-      }
+      if (months[key]) return named[3] + "-" + months[key] + "-" + named[2].padStart(2, "0");
     }
     return null;
   }
 
-  // ---------------- YELP/GOOGLE PASTE PARSER ----------------
-  var DATE_LINE_RE = /^[A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4}$/;
-  var NAME_LINK_RE = /\[([^\]]+)\]\(https?:\/\/[^\s)]*(?:user_details|maps\/contrib)[^\s)]*\)/g;
-  var PHOTO_LINK_RE = /\[\s*\d+\s*photos?\s*\]\([^)]*\)/gi;
-  var PURE_NUMBER_RE = /^\d+$/;
-  var CITY_STATE_RE = /^[A-Za-z .'-]+,\s*[A-Z]{2}$/;
-
-  function parseReviewBlob(text) {
-    if (!text || !text.trim()) return [];
-    var matches = [];
-    var m;
-    NAME_LINK_RE.lastIndex = 0;
-    while ((m = NAME_LINK_RE.exec(text)) !== null) {
-      matches.push({ name: m[1].trim(), index: m.index, end: m.index + m[0].length });
+  function guessOutletFromFilename(filename) {
+    var base = filename.replace(/\.csv$/i, "");
+    for (var i = 0; i < FILENAME_OUTLET_MAP.length; i++) {
+      if (FILENAME_OUTLET_MAP[i].pattern.test(base)) return FILENAME_OUTLET_MAP[i].outlet;
     }
-    if (!matches.length) return [];
-
-    var results = [];
-    for (var i = 0; i < matches.length; i++) {
-      var start = matches[i].end;
-      var end = i + 1 < matches.length ? matches[i + 1].index : text.length;
-      var block = text.slice(start, end);
-      var lines = block.split("\n").map(function (l) { return l.trim(); });
-
-      var date = "";
-      var commentLines = [];
-      lines.forEach(function (line) {
-        if (!line) return;
-        if (DATE_LINE_RE.test(line) && !date) { date = parseDateFlexible(line) || ""; return; }
-        if (PHOTO_LINK_RE.test(line)) return;
-        PHOTO_LINK_RE.lastIndex = 0;
-        if (PURE_NUMBER_RE.test(line)) return;
-        if (CITY_STATE_RE.test(line)) return;
-        commentLines.push(line);
-      });
-
-      var comment = commentLines.join(" ")
-        .replace(/^\(+/, "")
-        .replace(/\)+$/, "")
-        .replace(/\s{2,}/g, " ")
-        .trim();
-
-      results.push({ reviewer: matches[i].name, date: date, comment: comment, rating: "" });
-    }
-    return results;
+    return OUTLETS[0];
   }
 
   // ---- Passcode gate ----
@@ -465,30 +403,6 @@
     } else {
       el("rt-outlet-row").style.display = "grid";
     }
-
-    var bulkSel = el("rt-bulk-outlet");
-    if (bulkSel && !bulkSel.dataset.filled) {
-      OUTLETS.forEach(function (o) {
-        var opt = document.createElement("option");
-        opt.value = o;
-        opt.textContent = o;
-        bulkSel.appendChild(opt);
-      });
-      bulkSel.dataset.filled = "1";
-    }
-    if (bulkSel && currentTab !== "All") bulkSel.value = currentTab;
-
-    var pasteSel = el("rt-paste-outlet");
-    if (pasteSel && !pasteSel.dataset.filled) {
-      OUTLETS.forEach(function (o) {
-        var opt = document.createElement("option");
-        opt.value = o;
-        opt.textContent = o;
-        pasteSel.appendChild(opt);
-      });
-      pasteSel.dataset.filled = "1";
-    }
-    if (pasteSel && currentTab !== "All") pasteSel.value = currentTab;
   }
 
   function filtered() {
@@ -688,9 +602,8 @@
 
     if (role === "editor") {
       el("rt-submit").addEventListener("click", addReview);
-      el("rt-paste-parse").addEventListener("click", parsePastedReviews);
-      el("rt-paste-submit").addEventListener("click", addParsedReviews);
-      el("rt-bulk-submit").addEventListener("click", addBulkReviews);
+      el("rt-csv-input").addEventListener("change", handleCsvFilesSelected);
+      el("rt-csv-submit").addEventListener("click", importAllCsvFiles);
       el("rt-refresh").addEventListener("click", function () { el("rt-live-text").textContent = "Live"; });
     }
   }
@@ -733,169 +646,142 @@
     el("rt-date").value = todayStr();
   }
 
-  // ---------------- PASTE-FROM-YELP/GOOGLE UI ----------------
-  function renderParsedRows() {
-    var wrap = el("rt-parsed-list");
+  // ---------------- CSV UPLOAD ----------------
+  function readFileAsText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(reader.error); };
+      reader.readAsText(file);
+    });
+  }
+
+  function mapCsvRowToReview(row) {
+    var ratingRaw = row["Review Rating"] !== undefined ? row["Review Rating"] : row["Rating"];
+    var rating = Number(ratingRaw);
+    if (ratingRaw === undefined || ratingRaw === "" || isNaN(rating) || rating < 0 || rating > 5) return null;
+    var dateRaw = row["Review Date"] !== undefined ? row["Review Date"] : row["Date"];
+    var date = parseDateFlexible(dateRaw) || todayStr();
+    var reviewer = (row["Review Author"] !== undefined ? row["Review Author"] : row["Reviewer"]) || "";
+    var comment = (row["Review Text"] !== undefined ? row["Review Text"] : row["Comments"]) || "";
+    return { date: date, rating: rating, reviewer: reviewer.trim(), comment: comment.trim() };
+  }
+
+  async function handleCsvFilesSelected(e) {
+    var files = Array.prototype.slice.call(e.target.files || []);
+    var errorEl = el("rt-csv-error");
+    var resultEl = el("rt-csv-result");
+    errorEl.textContent = "";
+    resultEl.textContent = "";
+
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      var entry = { name: file.name, outlet: guessOutletFromFilename(file.name), rows: [], skipped: 0, error: "" };
+      try {
+        var text = await readFileAsText(file);
+        var parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+        parsed.data.forEach(function (row) {
+          var mapped = mapCsvRowToReview(row);
+          if (mapped) entry.rows.push(mapped);
+          else entry.skipped++;
+        });
+        if (!entry.rows.length) entry.error = "No valid rows found (check for a Review Rating column).";
+      } catch (err) {
+        entry.error = "Couldn't read this file.";
+        console.error(err);
+      }
+      csvFiles.push(entry);
+    }
+    el("rt-csv-input").value = "";
+    renderCsvFileList();
+  }
+
+  function renderCsvFileList() {
+    var wrap = el("rt-csv-file-list");
     wrap.innerHTML = "";
-    if (!parsedRows.length) {
-      el("rt-paste-submit").classList.add("rt-hidden");
-      return;
-    }
-    parsedRows.forEach(function (row, i) {
-      var card = document.createElement("div");
-      card.className = "rt-parsed-card";
-      card.innerHTML =
-        '<div class="rt-parsed-top">' +
-          '<input type="text" data-field="reviewer" data-idx="' + i + '" value="' + escapeHtml(row.reviewer) + '" placeholder="Reviewer name" />' +
-          '<input type="text" data-field="date" data-idx="' + i + '" value="' + escapeHtml(row.date) + '" placeholder="yyyy-mm-dd" />' +
-          '<input type="number" data-field="rating" data-idx="' + i + '" value="' + escapeHtml(row.rating) + '" min="0" max="5" step="0.5" placeholder="Rating" />' +
-        '</div>' +
-        '<textarea class="rt-parsed-comment" data-field="comment" data-idx="' + i + '">' + escapeHtml(row.comment) + '</textarea>' +
-        '<button class="rt-parsed-remove" data-idx="' + i + '">Remove this one</button>';
-      wrap.appendChild(card);
+    csvFiles.forEach(function (entry, i) {
+      var row = document.createElement("div");
+      row.className = "rt-csv-file-row";
+      var optionsHtml = OUTLETS.map(function (o) {
+        return '<option value="' + o + '"' + (o === entry.outlet ? " selected" : "") + '>' + o + '</option>';
+      }).join("");
+      row.innerHTML =
+        '<span class="rt-csv-file-name">' + escapeHtml(entry.name) + '</span>' +
+        '<select data-idx="' + i + '">' + optionsHtml + '</select>' +
+        '<span class="rt-csv-file-count">' + (entry.error ? entry.error : entry.rows.length + " reviews" + (entry.skipped ? ", " + entry.skipped + " skipped" : "")) + '</span>' +
+        '<button class="rt-csv-file-remove" data-idx="' + i + '">Remove</button>';
+      wrap.appendChild(row);
     });
-    wrap.querySelectorAll("[data-field]").forEach(function (input) {
-      input.addEventListener("input", function () {
-        var idx = Number(input.getAttribute("data-idx"));
-        parsedRows[idx][input.getAttribute("data-field")] = input.value;
+    wrap.querySelectorAll("select[data-idx]").forEach(function (sel) {
+      sel.addEventListener("change", function () {
+        csvFiles[Number(sel.getAttribute("data-idx"))].outlet = sel.value;
       });
     });
-    wrap.querySelectorAll(".rt-parsed-remove").forEach(function (btn) {
+    wrap.querySelectorAll(".rt-csv-file-remove").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        parsedRows.splice(Number(btn.getAttribute("data-idx")), 1);
-        renderParsedRows();
+        csvFiles.splice(Number(btn.getAttribute("data-idx")), 1);
+        renderCsvFileList();
       });
     });
-    el("rt-paste-submit").classList.remove("rt-hidden");
+    var hasImportable = csvFiles.some(function (f) { return f.rows.length > 0; });
+    el("rt-csv-submit").classList.toggle("rt-hidden", !hasImportable);
   }
 
-  function parsePastedReviews() {
-    var errorEl = el("rt-paste-error");
-    var resultEl = el("rt-paste-result");
-    errorEl.textContent = "";
-    resultEl.textContent = "";
-    var text = el("rt-paste-text").value;
-    parsedRows = parseReviewBlob(text);
-    if (!parsedRows.length) {
-      errorEl.textContent = "Couldn't find a reviewer name/link in that text. Make sure you copied the reviewer's name as it links to their profile.";
-      renderParsedRows();
-      return;
-    }
-    renderParsedRows();
-  }
-
-  async function addParsedReviews() {
-    var outlet = el("rt-paste-outlet").value;
-    var source = el("rt-paste-source").value;
-    var errorEl = el("rt-paste-error");
-    var resultEl = el("rt-paste-result");
+  async function importAllCsvFiles() {
+    var source = el("rt-csv-source").value;
+    var errorEl = el("rt-csv-error");
+    var resultEl = el("rt-csv-result");
+    var submitBtn = el("rt-csv-submit");
     errorEl.textContent = "";
     resultEl.textContent = "";
 
-    var invalid = [];
-    parsedRows.forEach(function (row, i) {
-      var r = Number(row.rating);
-      if (row.rating === "" || isNaN(r) || r < 0 || r > 5) invalid.push(i + 1);
+    var allRows = [];
+    csvFiles.forEach(function (entry) {
+      entry.rows.forEach(function (row) {
+        allRows.push({ outlet: entry.outlet, source: source, date: row.date, rating: row.rating, reviewer: row.reviewer, comment: row.comment });
+      });
     });
-    if (invalid.length) {
-      errorEl.textContent = "Add a rating (0–5) for row" + (invalid.length === 1 ? "" : "s") + " " + invalid.join(", ") + " before adding.";
+
+    if (!allRows.length) {
+      errorEl.textContent = "No rows to import yet.";
       return;
     }
-    if (!parsedRows.length) return;
 
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Importing...";
     try {
-      var batch = writeBatch(db);
-      parsedRows.forEach(function (row, i) {
-        var ref = doc(reviewsCol);
-        batch.set(ref, {
-          outlet: outlet,
-          source: source,
-          date: parseDateFlexible(row.date) || row.date || todayStr(),
-          rating: Number(row.rating),
-          reviewer: row.reviewer,
-          comment: row.comment,
-          createdAtMs: Date.now() + i,
-          createdAt: serverTimestamp()
+      var CHUNK = 400;
+      for (var start = 0; start < allRows.length; start += CHUNK) {
+        var batch = writeBatch(db);
+        var chunk = allRows.slice(start, start + CHUNK);
+        chunk.forEach(function (row, i) {
+          var ref = doc(reviewsCol);
+          batch.set(ref, {
+            outlet: row.outlet,
+            source: row.source,
+            date: row.date,
+            rating: row.rating,
+            reviewer: row.reviewer,
+            comment: row.comment,
+            createdAtMs: Date.now() + start + i,
+            createdAt: serverTimestamp()
+          });
         });
-      });
-      await batch.commit();
+        await batch.commit();
+      }
     } catch (e) {
       errorEl.textContent = "Could not save. Check your connection and try again.";
       console.error(e);
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Import all files";
       return;
     }
 
-    resultEl.textContent = "Added " + parsedRows.length + (parsedRows.length === 1 ? " review." : " reviews.");
-    parsedRows = [];
-    el("rt-paste-text").value = "";
-    renderParsedRows();
-  }
-
-  async function addBulkReviews() {
-    var outlet = el("rt-bulk-outlet").value;
-    var source = el("rt-bulk-source").value;
-    var raw = el("rt-bulk-text").value;
-    var errorEl = el("rt-bulk-error");
-    var resultEl = el("rt-bulk-result");
-    errorEl.textContent = "";
-    resultEl.textContent = "";
-
-    var lines = raw.split("\n").map(function (l) { return l.replace(/\r$/, ""); }).filter(function (l) { return l.trim().length > 0; });
-    if (!lines.length) {
-      errorEl.textContent = "Paste at least one row first.";
-      return;
-    }
-
-    var rows = [];
-    var skipped = [];
-    lines.forEach(function (line, i) {
-      var parts = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
-      parts = parts.map(function (p) { return p.trim(); });
-      if (parts.length < 2) {
-        skipped.push(i + 1);
-        return;
-      }
-      var dateVal = parseDateFlexible(parts[0]) || todayStr();
-      var ratingVal = Number(parts[1]);
-      if (parts[1] === "" || isNaN(ratingVal) || ratingVal < 0 || ratingVal > 5) {
-        skipped.push(i + 1);
-        return;
-      }
-      var reviewer = parts[2] || "";
-      var comment = parts.slice(3).join(", ") || "";
-      rows.push({ date: dateVal, rating: ratingVal, reviewer: reviewer, comment: comment });
-    });
-
-    if (!rows.length) {
-      errorEl.textContent = "Couldn't read any valid rows. Check that each line has at least a date and a rating (0–5).";
-      return;
-    }
-
-    try {
-      var batch = writeBatch(db);
-      rows.forEach(function (row, i) {
-        var ref = doc(reviewsCol);
-        batch.set(ref, {
-          outlet: outlet,
-          source: source,
-          date: row.date,
-          rating: row.rating,
-          reviewer: row.reviewer,
-          comment: row.comment,
-          createdAtMs: Date.now() + i,
-          createdAt: serverTimestamp()
-        });
-      });
-      await batch.commit();
-    } catch (e) {
-      errorEl.textContent = "Could not save. Check your connection and try again.";
-      console.error(e);
-      return;
-    }
-
-    el("rt-bulk-text").value = "";
-    resultEl.textContent = "Added " + rows.length + (rows.length === 1 ? " review" : " reviews") +
-      (skipped.length ? "; skipped " + skipped.length + " row" + (skipped.length === 1 ? "" : "s") + " (line " + skipped.join(", ") + ") — missing or invalid rating." : ".");
+    resultEl.textContent = "Imported " + allRows.length + (allRows.length === 1 ? " review" : " reviews") + " from " + csvFiles.length + " file" + (csvFiles.length === 1 ? "" : "s") + ".";
+    csvFiles = [];
+    renderCsvFileList();
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Import all files";
   }
 
   async function deleteReview(id) {
