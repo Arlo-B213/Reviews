@@ -9,6 +9,7 @@
     --muted: #6B6F76;
     --line: #E4DFD3;
     --danger: #A3352B;
+    --green: #2F7A4B;
   }
   * { box-sizing: border-box; }
   body { margin: 0; }
@@ -38,7 +39,7 @@
   .rt-form { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 22px; }
   .rt-form h2 { font-size: 14px; margin: 0 0 12px; color: var(--navy); font-weight: 600; }
   .rt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-  .rt-field { display: flex; flex-direction: column; gap: 4px; }
+  .rt-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
   .rt-field label { font-size: 11.5px; color: var(--muted); font-weight: 600; }
   .rt-field input, .rt-field select, .rt-field textarea {
     font-family: inherit; font-size: 13.5px; padding: 8px 10px; border: 1px solid var(--line);
@@ -59,9 +60,11 @@
   .rt-refresh:hover { border-color: var(--gold); color: var(--navy); }
   .rt-card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px; margin-bottom: 9px; }
   .rt-card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .rt-card-badges { display: flex; gap: 6px; flex-wrap: wrap; }
   .rt-stars { color: var(--gold); font-size: 13.5px; letter-spacing: 1px; }
   .rt-rating-num { font-size: 12px; color: var(--muted); margin-left: 4px; }
   .rt-badge { font-size: 10.5px; background: var(--gold-light); color: #7A5E1F; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .rt-badge-source { background: #E7ECF5; color: var(--navy); }
   .rt-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .rt-comment { font-size: 13.5px; color: var(--ink); margin-top: 7px; line-height: 1.5; }
   .rt-del { background: none; border: none; color: var(--muted); font-size: 11.5px; cursor: pointer; padding: 0; text-decoration: underline; }
@@ -69,6 +72,26 @@
   .rt-empty { text-align: center; padding: 34px 12px; color: var(--muted); font-size: 13px; }
   .rt-notice { font-size: 11.5px; color: var(--muted); margin-top: 14px; text-align: center; }
   @media (max-width: 480px) { .rt-row { grid-template-columns: 1fr; } }
+
+  /* Viewer dashboard */
+  .rt-section { margin-bottom: 26px; }
+  .rt-section h2 { font-size: 14px; color: var(--navy); font-weight: 600; margin: 0 0 12px; }
+  .rt-rank-list { background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .rt-rank-row { display: flex; align-items: center; gap: 12px; padding: 11px 15px; border-bottom: 1px solid var(--line); }
+  .rt-rank-row:last-child { border-bottom: none; }
+  .rt-rank-num { width: 22px; height: 22px; border-radius: 50%; background: var(--navy); color: #fff; font-size: 11.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .rt-rank-num.gold { background: var(--gold); color: #4A3A14; }
+  .rt-rank-outlet { flex: 1; font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .rt-rank-stars { color: var(--gold); font-size: 13px; letter-spacing: 1px; }
+  .rt-rank-avg { font-size: 13.5px; font-weight: 700; color: var(--navy); min-width: 30px; text-align: right; }
+  .rt-rank-count { font-size: 11.5px; color: var(--muted); min-width: 70px; text-align: right; }
+  .rt-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .rt-chart-card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .rt-chart-card h3 { font-size: 12.5px; color: var(--navy); font-weight: 600; margin: 0 0 10px; }
+  .rt-chart-card canvas { max-height: 220px; }
+  @media (max-width: 560px) { .rt-charts { grid-template-columns: 1fr; } }
+  .rt-segment-low h2 { color: var(--danger); }
+  .rt-segment-high h2 { color: var(--green); }
 </style>
 
 <div class="rt-app">
@@ -86,56 +109,103 @@
     <div class="rt-header">
       <div>
         <h1>Food court review tracker</h1>
-        <p>Pronto · Agave · American Classics · Pechanga Fried Chicken · Cafe Cocoa's · Little Wok · Portable Smart Bar</p>
+        <p>Pronto · Agave · American Classics · Pechanga Fried Chicken · Cafe Cocoa's · Little Wok</p>
       </div>
       <div class="rt-live"><span class="rt-dot"></span><span id="rt-live-text">Live</span><span id="rt-role-badge" class="rt-badge rt-hidden" style="margin-left:8px;">Viewing only</span></div>
     </div>
 
-    <div class="rt-tabs" id="rt-tabs"></div>
+    <!-- EDITOR VIEW -->
+    <div id="rt-editor-view" class="rt-hidden">
+      <div class="rt-tabs" id="rt-tabs"></div>
+      <div class="rt-body">
+        <div class="rt-summary" id="rt-summary"></div>
 
-    <div class="rt-body">
-      <div class="rt-summary" id="rt-summary"></div>
-
-      <div class="rt-form">
-        <h2>Log a review</h2>
-        <div class="rt-row" id="rt-outlet-row">
-          <div class="rt-field">
-            <label for="rt-outlet">Outlet</label>
-            <select id="rt-outlet"></select>
+        <div class="rt-form">
+          <h2>Log a review</h2>
+          <div class="rt-row" id="rt-outlet-row">
+            <div class="rt-field">
+              <label for="rt-outlet">Outlet</label>
+              <select id="rt-outlet"></select>
+            </div>
+            <div class="rt-field">
+              <label for="rt-date">Date</label>
+              <input type="date" id="rt-date" />
+            </div>
           </div>
-          <div class="rt-field">
-            <label for="rt-date">Date</label>
-            <input type="date" id="rt-date" />
-          </div>
-        </div>
-        <div class="rt-row">
-          <div class="rt-field">
-            <label for="rt-rating">Rating (0–5)</label>
-            <input type="number" id="rt-rating" min="0" max="5" step="0.5" placeholder="4.5" />
+          <div class="rt-row">
+            <div class="rt-field">
+              <label for="rt-source">Source</label>
+              <select id="rt-source">
+                <option value="Yelp">Yelp</option>
+                <option value="Google">Google</option>
+                <option value="TripAdvisor">TripAdvisor</option>
+              </select>
+            </div>
+            <div class="rt-field">
+              <label for="rt-rating">Rating (0–5)</label>
+              <input type="number" id="rt-rating" min="0" max="5" step="0.5" placeholder="4.5" />
+            </div>
           </div>
           <div class="rt-field">
             <label for="rt-reviewer">Reviewer name</label>
             <input type="text" id="rt-reviewer" placeholder="Jamie R." />
           </div>
+          <div class="rt-field" style="margin-bottom: 6px;">
+            <label for="rt-comment">What they said</label>
+            <textarea id="rt-comment" placeholder="Fast service, friendly staff..."></textarea>
+          </div>
+          <div class="rt-error" id="rt-error"></div>
+          <button class="rt-submit" id="rt-submit">Add review</button>
         </div>
-        <div class="rt-field" style="margin-bottom: 6px;">
-          <label for="rt-comment">What they said</label>
-          <textarea id="rt-comment" placeholder="Fast service, friendly staff..."></textarea>
-        </div>
-        <div class="rt-error" id="rt-error"></div>
-        <button class="rt-submit" id="rt-submit">Add review</button>
-      </div>
 
-      <div class="rt-list-head">
-        <h2 id="rt-list-title">All reviews</h2>
-        <button class="rt-refresh" id="rt-refresh">Refresh</button>
+        <div class="rt-list-head">
+          <h2 id="rt-list-title">All reviews</h2>
+          <button class="rt-refresh" id="rt-refresh">Refresh</button>
+        </div>
+        <div id="rt-list"></div>
+        <p class="rt-notice" id="rt-notice-editor">Synced live via Firebase. Anyone with the editor passcode can add or delete reviews.</p>
       </div>
-      <div id="rt-list"></div>
-      <p class="rt-notice" id="rt-notice">Synced live via Firebase.</p>
+    </div>
+
+    <!-- VIEWER DASHBOARD -->
+    <div id="rt-viewer-view" class="rt-hidden">
+      <div class="rt-body">
+        <div class="rt-section">
+          <h2>Outlet ranking, highest rated first</h2>
+          <div class="rt-rank-list" id="rt-rank-list"></div>
+        </div>
+
+        <div class="rt-section">
+          <h2>At a glance</h2>
+          <div class="rt-charts">
+            <div class="rt-chart-card">
+              <h3>Average rating by outlet</h3>
+              <canvas id="rt-chart-rating"></canvas>
+            </div>
+            <div class="rt-chart-card">
+              <h3>Reviews by source</h3>
+              <canvas id="rt-chart-source"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="rt-section rt-segment-low">
+          <h2>Needs attention — lowest rated reviews</h2>
+          <div id="rt-low-list"></div>
+        </div>
+
+        <div class="rt-section rt-segment-high">
+          <h2>Top reviews — highest rated</h2>
+          <div id="rt-high-list"></div>
+        </div>
+
+        <p class="rt-notice">Synced live via Firebase. You're in view-only mode.</p>
+      </div>
     </div>
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import {
@@ -160,9 +230,16 @@
   var db = getFirestore(app);
   var reviewsCol = collection(db, "reviews");
 
-  var OUTLETS = ["Pronto", "Agave", "American Classics", "Pechanga Fried Chicken", "Cafe Cocoa's", "Little Wok", "Portable Smart Bar"];
+  var OUTLETS = ["Pronto", "Agave", "American Classics", "Pechanga Fried Chicken", "Cafe Cocoa's", "Little Wok"];
+  var SOURCES = ["Yelp", "Google", "TripAdvisor"];
+  var LOW_THRESHOLD = 2.5;
+  var HIGH_THRESHOLD = 4.5;
+  var SEGMENT_LIMIT = 10;
+
   var currentTab = "All";
   var reviews = [];
+  var ratingChart = null;
+  var sourceChart = null;
 
   function el(id) { return document.getElementById(id); }
 
@@ -192,7 +269,30 @@
     startApp();
   }
 
-  // ---- App logic ----
+  function starString(rating) {
+    var full = Math.floor(rating);
+    var half = rating - full >= 0.5;
+    var str = "";
+    for (var i = 0; i < full; i++) str += "\u2605";
+    if (half) str += "\u00BD";
+    var remaining = 5 - full - (half ? 1 : 0);
+    for (var j = 0; j < remaining; j++) str += "\u2606";
+    return str;
+  }
+
+  function escapeHtml(s) {
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function outletStats(outlet) {
+    var list = reviews.filter(function (r) { return r.outlet === outlet; });
+    var avg = list.length ? (list.reduce(function (s, r) { return s + Number(r.rating); }, 0) / list.length) : null;
+    return { list: list, avg: avg, count: list.length };
+  }
+
+  // ---------------- EDITOR RENDERING ----------------
   function renderTabs() {
     var wrap = el("rt-tabs");
     wrap.innerHTML = "";
@@ -200,7 +300,7 @@
       var b = document.createElement("button");
       b.className = "rt-tab" + (name === currentTab ? " active" : "");
       b.textContent = name;
-      b.onclick = function () { currentTab = name; renderAll(); };
+      b.onclick = function () { currentTab = name; renderEditor(); };
       wrap.appendChild(b);
     });
   }
@@ -227,32 +327,35 @@
     return reviews.filter(function (r) { return r.outlet === currentTab; });
   }
 
-  function starString(rating) {
-    var full = Math.floor(rating);
-    var half = rating - full >= 0.5;
-    var str = "";
-    for (var i = 0; i < full; i++) str += "\u2605";
-    if (half) str += "\u00BD";
-    var remaining = 5 - full - (half ? 1 : 0);
-    for (var j = 0; j < remaining; j++) str += "\u2606";
-    return str;
-  }
-
   function renderSummary() {
     var wrap = el("rt-summary");
     wrap.innerHTML = "";
     var groups = currentTab === "All" ? OUTLETS : [currentTab];
     groups.forEach(function (outlet) {
-      var list = reviews.filter(function (r) { return r.outlet === outlet; });
-      var avg = list.length ? (list.reduce(function (s, r) { return s + Number(r.rating); }, 0) / list.length) : null;
+      var s = outletStats(outlet);
       var card = document.createElement("div");
       card.className = "rt-stat";
       card.innerHTML =
         '<div class="label">' + outlet + '</div>' +
-        '<div class="value">' + (avg === null ? "—" : avg.toFixed(1)) + '</div>' +
-        '<div class="rt-meta" style="margin-top:0;">' + list.length + (list.length === 1 ? " review" : " reviews") + '</div>';
+        '<div class="value">' + (s.avg === null ? "—" : s.avg.toFixed(1)) + '</div>' +
+        '<div class="rt-meta" style="margin-top:0;">' + s.count + (s.count === 1 ? " review" : " reviews") + '</div>';
       wrap.appendChild(card);
     });
+  }
+
+  function reviewCardHtml(r, showOutletBadge) {
+    var dateDisplay = r.date ? new Date(r.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+    return (
+      '<div class="rt-card-top">' +
+        '<div><span class="rt-stars">' + starString(Number(r.rating)) + '</span><span class="rt-rating-num">' + Number(r.rating).toFixed(1) + '</span></div>' +
+        '<div class="rt-card-badges">' +
+          (showOutletBadge ? '<span class="rt-badge">' + r.outlet + '</span>' : '') +
+          (r.source ? '<span class="rt-badge rt-badge-source">' + r.source + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="rt-meta">' + (r.reviewer || "Anonymous") + (dateDisplay ? " · " + dateDisplay : "") + '</div>' +
+      (r.comment ? '<div class="rt-comment">' + escapeHtml(r.comment) + '</div>' : '')
+    );
   }
 
   function renderList() {
@@ -270,47 +373,127 @@
     data.forEach(function (r) {
       var card = document.createElement("div");
       card.className = "rt-card";
-      var dateDisplay = r.date ? new Date(r.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
-      card.innerHTML =
-        '<div class="rt-card-top">' +
-          '<div><span class="rt-stars">' + starString(Number(r.rating)) + '</span><span class="rt-rating-num">' + Number(r.rating).toFixed(1) + '</span></div>' +
-          (currentTab === "All" ? '<span class="rt-badge">' + r.outlet + '</span>' : '') +
-        '</div>' +
-        '<div class="rt-meta">' + (r.reviewer || "Anonymous") + (dateDisplay ? " · " + dateDisplay : "") + '</div>' +
-        (r.comment ? '<div class="rt-comment">' + escapeHtml(r.comment) + '</div>' : '') +
-        (role === "editor" ? '<div style="margin-top:8px;"><button class="rt-del" data-id="' + r.id + '">Delete</button></div>' : '');
+      card.innerHTML = reviewCardHtml(r, currentTab === "All") +
+        '<div style="margin-top:8px;"><button class="rt-del" data-id="' + r.id + '">Delete</button></div>';
       listEl.appendChild(card);
     });
-    if (role === "editor") {
-      listEl.querySelectorAll(".rt-del").forEach(function (btn) {
-        btn.addEventListener("click", function () { deleteReview(btn.getAttribute("data-id")); });
-      });
-    }
+    listEl.querySelectorAll(".rt-del").forEach(function (btn) {
+      btn.addEventListener("click", function () { deleteReview(btn.getAttribute("data-id")); });
+    });
   }
 
-  function escapeHtml(s) {
-    var d = document.createElement("div");
-    d.textContent = s;
-    return d.innerHTML;
-  }
-
-  function renderAll() {
+  function renderEditor() {
     renderTabs();
     renderOutletSelect();
     renderSummary();
     renderList();
   }
 
+  // ---------------- VIEWER RENDERING ----------------
+  function renderRankList() {
+    var ranked = OUTLETS.map(function (o) { return { outlet: o, stats: outletStats(o) }; })
+      .sort(function (a, b) {
+        if (a.stats.avg === null && b.stats.avg === null) return 0;
+        if (a.stats.avg === null) return 1;
+        if (b.stats.avg === null) return -1;
+        return b.stats.avg - a.stats.avg;
+      });
+    var wrap = el("rt-rank-list");
+    wrap.innerHTML = "";
+    ranked.forEach(function (item, i) {
+      var row = document.createElement("div");
+      row.className = "rt-rank-row";
+      var numClass = i === 0 && item.stats.avg !== null ? "rt-rank-num gold" : "rt-rank-num";
+      row.innerHTML =
+        '<div class="' + numClass + '">' + (i + 1) + '</div>' +
+        '<div class="rt-rank-outlet">' + item.outlet + '</div>' +
+        '<div class="rt-rank-stars">' + (item.stats.avg !== null ? starString(item.stats.avg) : "—") + '</div>' +
+        '<div class="rt-rank-avg">' + (item.stats.avg !== null ? item.stats.avg.toFixed(1) : "—") + '</div>' +
+        '<div class="rt-rank-count">' + item.stats.count + (item.stats.count === 1 ? " review" : " reviews") + '</div>';
+      wrap.appendChild(row);
+    });
+  }
+
+  function renderCharts() {
+    var ratingData = OUTLETS.map(function (o) { return outletStats(o).avg; });
+    var ctx1 = el("rt-chart-rating").getContext("2d");
+    if (ratingChart) ratingChart.destroy();
+    ratingChart = new Chart(ctx1, {
+      type: "bar",
+      data: {
+        labels: OUTLETS,
+        datasets: [{
+          data: ratingData.map(function (v) { return v === null ? 0 : Number(v.toFixed(1)); }),
+          backgroundColor: "#C9A24B",
+          borderRadius: 4
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { min: 0, max: 5, ticks: { stepSize: 1 } }, x: { ticks: { autoSkip: false, maxRotation: 40, minRotation: 0, font: { size: 10 } } } }
+      }
+    });
+
+    var sourceCounts = SOURCES.map(function (s) { return reviews.filter(function (r) { return r.source === s; }).length; });
+    var ctx2 = el("rt-chart-source").getContext("2d");
+    if (sourceChart) sourceChart.destroy();
+    sourceChart = new Chart(ctx2, {
+      type: "doughnut",
+      data: {
+        labels: SOURCES,
+        datasets: [{
+          data: sourceCounts,
+          backgroundColor: ["#1F2A44", "#C9A24B", "#8A97AE"]
+        }]
+      },
+      options: { plugins: { legend: { position: "bottom", labels: { font: { size: 11 } } } } }
+    });
+  }
+
+  function renderSegmentList(containerId, list, emptyText) {
+    var wrap = el(containerId);
+    wrap.innerHTML = "";
+    if (!list.length) {
+      var empty = document.createElement("div");
+      empty.className = "rt-empty";
+      empty.textContent = emptyText;
+      wrap.appendChild(empty);
+      return;
+    }
+    list.forEach(function (r) {
+      var card = document.createElement("div");
+      card.className = "rt-card";
+      card.innerHTML = reviewCardHtml(r, true);
+      wrap.appendChild(card);
+    });
+  }
+
+  function renderViewer() {
+    renderRankList();
+    renderCharts();
+
+    var sorted = reviews.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || "") || (b._order - a._order); });
+    var low = sorted.filter(function (r) { return Number(r.rating) <= LOW_THRESHOLD; }).slice(0, SEGMENT_LIMIT);
+    var high = sorted.filter(function (r) { return Number(r.rating) >= HIGH_THRESHOLD; }).slice(0, SEGMENT_LIMIT);
+
+    renderSegmentList("rt-low-list", low, "No low-rated reviews logged.");
+    renderSegmentList("rt-high-list", high, "No high-rated reviews logged yet.");
+  }
+
+  function renderAll() {
+    if (role === "editor") renderEditor();
+    else renderViewer();
+  }
+
   function startApp() {
     el("rt-date").value = todayStr();
-    renderOutletSelect();
 
     if (role === "viewer") {
-      document.querySelector(".rt-form").classList.add("rt-hidden");
+      el("rt-viewer-view").classList.remove("rt-hidden");
       el("rt-role-badge").classList.remove("rt-hidden");
-      el("rt-notice").textContent = "Synced live via Firebase. You're in view-only mode.";
     } else {
-      el("rt-notice").textContent = "Synced live via Firebase. Anyone with the editor passcode can add or delete reviews.";
+      el("rt-editor-view").classList.remove("rt-hidden");
+      renderOutletSelect();
     }
 
     onSnapshot(reviewsCol, function (snapshot) {
@@ -319,6 +502,7 @@
         return {
           id: d.id,
           outlet: data.outlet,
+          source: data.source || "",
           date: data.date,
           rating: data.rating,
           reviewer: data.reviewer,
@@ -333,12 +517,15 @@
       console.error("Firestore error:", err);
     });
 
-    el("rt-submit").addEventListener("click", addReview);
-    el("rt-refresh").addEventListener("click", function () { el("rt-live-text").textContent = "Live"; });
+    if (role === "editor") {
+      el("rt-submit").addEventListener("click", addReview);
+      el("rt-refresh").addEventListener("click", function () { el("rt-live-text").textContent = "Live"; });
+    }
   }
 
   async function addReview() {
     var outlet = el("rt-outlet").value;
+    var source = el("rt-source").value;
     var dateVal = el("rt-date").value || todayStr();
     var ratingVal = el("rt-rating").value;
     var reviewer = el("rt-reviewer").value.trim();
@@ -354,6 +541,7 @@
     try {
       await addDoc(reviewsCol, {
         outlet: outlet,
+        source: source,
         date: dateVal,
         rating: Number(ratingVal),
         reviewer: reviewer,
