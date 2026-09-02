@@ -88,7 +88,7 @@
         <h1>Food court review tracker</h1>
         <p>Pronto · Agave · American Classics · Pechanga Fried Chicken · Cafe Cocoa's · Little Wok · Portable Smart Bar</p>
       </div>
-      <div class="rt-live"><span class="rt-dot"></span><span id="rt-live-text">Live</span></div>
+      <div class="rt-live"><span class="rt-dot"></span><span id="rt-live-text">Live</span><span id="rt-role-badge" class="rt-badge rt-hidden" style="margin-left:8px;">Viewing only</span></div>
     </div>
 
     <div class="rt-tabs" id="rt-tabs"></div>
@@ -131,7 +131,7 @@
         <button class="rt-refresh" id="rt-refresh">Refresh</button>
       </div>
       <div id="rt-list"></div>
-      <p class="rt-notice">Synced live via Firebase. Anyone who has the passcode and this file can view and add reviews.</p>
+      <p class="rt-notice" id="rt-notice">Synced live via Firebase.</p>
     </div>
   </div>
 </div>
@@ -142,8 +142,10 @@
     getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-  // ---- EDIT THIS to change the shared passcode ----
-  var PASSCODE = "foodcourt2026";
+  // ---- EDIT THESE to change the shared passcodes ----
+  var PASSCODE_EDITOR = "fb2026";
+  var PASSCODE_VIEWER = "pechanga-view";
+  var role = null; // "editor" or "viewer"
 
   var firebaseConfig = {
     apiKey: "AIzaSyCs6_YRPZsGDkb4hUFU4uVvfwyN9gPKUDg",
@@ -177,13 +179,17 @@
 
   function checkPasscode() {
     var entered = el("rt-passcode").value;
-    if (entered === PASSCODE) {
-      el("rt-gate").classList.add("rt-hidden");
-      el("rt-main").classList.remove("rt-hidden");
-      startApp();
+    if (entered === PASSCODE_EDITOR) {
+      role = "editor";
+    } else if (entered === PASSCODE_VIEWER) {
+      role = "viewer";
     } else {
       el("rt-gate-error").textContent = "That passcode isn't right. Try again.";
+      return;
     }
+    el("rt-gate").classList.add("rt-hidden");
+    el("rt-main").classList.remove("rt-hidden");
+    startApp();
   }
 
   // ---- App logic ----
@@ -272,12 +278,14 @@
         '</div>' +
         '<div class="rt-meta">' + (r.reviewer || "Anonymous") + (dateDisplay ? " · " + dateDisplay : "") + '</div>' +
         (r.comment ? '<div class="rt-comment">' + escapeHtml(r.comment) + '</div>' : '') +
-        '<div style="margin-top:8px;"><button class="rt-del" data-id="' + r.id + '">Delete</button></div>';
+        (role === "editor" ? '<div style="margin-top:8px;"><button class="rt-del" data-id="' + r.id + '">Delete</button></div>' : '');
       listEl.appendChild(card);
     });
-    listEl.querySelectorAll(".rt-del").forEach(function (btn) {
-      btn.addEventListener("click", function () { deleteReview(btn.getAttribute("data-id")); });
-    });
+    if (role === "editor") {
+      listEl.querySelectorAll(".rt-del").forEach(function (btn) {
+        btn.addEventListener("click", function () { deleteReview(btn.getAttribute("data-id")); });
+      });
+    }
   }
 
   function escapeHtml(s) {
@@ -296,6 +304,14 @@
   function startApp() {
     el("rt-date").value = todayStr();
     renderOutletSelect();
+
+    if (role === "viewer") {
+      document.querySelector(".rt-form").classList.add("rt-hidden");
+      el("rt-role-badge").classList.remove("rt-hidden");
+      el("rt-notice").textContent = "Synced live via Firebase. You're in view-only mode.";
+    } else {
+      el("rt-notice").textContent = "Synced live via Firebase. Anyone with the editor passcode can add or delete reviews.";
+    }
 
     onSnapshot(reviewsCol, function (snapshot) {
       reviews = snapshot.docs.map(function (d, i) {
