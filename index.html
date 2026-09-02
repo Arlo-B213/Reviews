@@ -95,7 +95,7 @@
 </style>
 
 <div class="rt-app">
-  <div class="rt-gate" id="rt-gate">
+  <div class="rt-gate rt-hidden" id="rt-gate">
     <h1>Food court review tracker</h1>
     <p>Enter the passcode to continue.</p>
     <div>
@@ -105,7 +105,7 @@
     <div class="rt-gate-error" id="rt-gate-error"></div>
   </div>
 
-  <div id="rt-main" class="rt-hidden">
+  <div id="rt-main">
     <div class="rt-header">
       <div>
         <h1>Food court review tracker</h1>
@@ -215,6 +215,8 @@
   // ---- EDIT THESE to change the shared passcodes ----
   var PASSCODE_EDITOR = "fb2026";
   var PASSCODE_VIEWER = "pechanga-view";
+  // ---- Passcode gate is OFF while building. Set to true to require a passcode again. ----
+  var REQUIRE_PASSCODE = false;
   var role = null; // "editor" or "viewer"
 
   var firebaseConfig = {
@@ -251,8 +253,14 @@
   }
 
   // ---- Passcode gate ----
-  el("rt-gate-btn").addEventListener("click", checkPasscode);
-  el("rt-passcode").addEventListener("keydown", function (e) { if (e.key === "Enter") checkPasscode(); });
+  if (REQUIRE_PASSCODE) {
+    el("rt-gate").classList.remove("rt-hidden");
+    el("rt-gate-btn").addEventListener("click", checkPasscode);
+    el("rt-passcode").addEventListener("keydown", function (e) { if (e.key === "Enter") checkPasscode(); });
+  } else {
+    role = "editor";
+    startApp();
+  }
 
   function checkPasscode() {
     var entered = el("rt-passcode").value;
