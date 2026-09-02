@@ -92,6 +92,13 @@
   @media (max-width: 560px) { .rt-charts { grid-template-columns: 1fr; } }
   .rt-segment-low h2 { color: var(--danger); }
   .rt-segment-high h2 { color: var(--green); }
+  .rt-parsed-card { background: var(--cream); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .rt-parsed-top { display: grid; grid-template-columns: 1.4fr 1fr 0.8fr; gap: 8px; margin-bottom: 6px; }
+  .rt-parsed-top input { font-size: 13px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .rt-parsed-comment { width: 100%; font-size: 13px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; resize: vertical; min-height: 44px; font-family: inherit; }
+  .rt-parsed-remove { background: none; border: none; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; padding: 0; margin-top: 4px; }
+  .rt-parsed-remove:hover { color: var(--danger); }
+  @media (max-width: 480px) { .rt-parsed-top { grid-template-columns: 1fr; } }
 </style>
 
 <div class="rt-app">
@@ -156,6 +163,35 @@
           </div>
           <div class="rt-error" id="rt-error"></div>
           <button class="rt-submit" id="rt-submit">Add review</button>
+        </div>
+
+        <div class="rt-form">
+          <h2>Paste from Yelp / Google</h2>
+          <p class="rt-meta" style="margin: 0 0 10px;">Select and copy a review straight off the site — name, date, photo links and all — and paste the raw text below. It works for one review or several pasted together. You'll just need to fill in the star rating for each, since that isn't in the copied text.</p>
+          <div class="rt-row">
+            <div class="rt-field">
+              <label for="rt-paste-outlet">Outlet</label>
+              <select id="rt-paste-outlet"></select>
+            </div>
+            <div class="rt-field">
+              <label for="rt-paste-source">Source</label>
+              <select id="rt-paste-source">
+                <option value="Yelp">Yelp</option>
+                <option value="Google">Google</option>
+                <option value="TripAdvisor">TripAdvisor</option>
+              </select>
+            </div>
+          </div>
+          <div class="rt-field" style="margin-bottom: 6px;">
+            <label for="rt-paste-text">Pasted review text</label>
+            <textarea id="rt-paste-text" style="min-height: 110px;" placeholder="Paste the copied review block(s) here..."></textarea>
+          </div>
+          <div class="rt-error" id="rt-paste-error"></div>
+          <button class="rt-submit" id="rt-paste-parse">Parse pasted text</button>
+
+          <div id="rt-parsed-list" style="margin-top: 14px;"></div>
+          <button class="rt-submit rt-hidden" id="rt-paste-submit" style="margin-top: 10px;">Add reviews</button>
+          <div class="rt-meta" id="rt-paste-result" style="margin-top: 8px;"></div>
         </div>
 
         <div class="rt-form">
@@ -267,6 +303,7 @@
 
   var currentTab = "All";
   var reviews = [];
+  var parsedRows = [];
   var ratingChart = null;
   var sourceChart = null;
 
@@ -279,7 +316,7 @@
     return d.getFullYear() + "-" + m + "-" + day;
   }
 
-  // Accepts "8/31/2026", "08/31/2026", or "2026-08-31" and returns "yyyy-mm-dd", or null if unparseable.
+  // Accepts "8/31/2026", "08/31/2026", "2026-08-31", or "Aug 29, 2026" and returns "yyyy-mm-dd", or null if unparseable.
   function parseDateFlexible(raw) {
     if (!raw) return null;
     raw = raw.trim();
@@ -294,7 +331,62 @@
       var yyyy = us[3].length === 2 ? "20" + us[3] : us[3];
       return yyyy + "-" + mm + "-" + dd;
     }
+    var months = { jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06", jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12" };
+    var named = /^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/.exec(raw);
+    if (named) {
+      var key = named[1].slice(0, 3).toLowerCase();
+      if (months[key]) {
+        return named[3] + "-" + months[key] + "-" + named[2].padStart(2, "0");
+      }
+    }
     return null;
+  }
+
+  // ---------------- YELP/GOOGLE PASTE PARSER ----------------
+  var DATE_LINE_RE = /^[A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4}$/;
+  var NAME_LINK_RE = /\[([^\]]+)\]\(https?:\/\/[^\s)]*(?:user_details|maps\/contrib)[^\s)]*\)/g;
+  var PHOTO_LINK_RE = /\[\s*\d+\s*photos?\s*\]\([^)]*\)/gi;
+  var PURE_NUMBER_RE = /^\d+$/;
+  var CITY_STATE_RE = /^[A-Za-z .'-]+,\s*[A-Z]{2}$/;
+
+  function parseReviewBlob(text) {
+    if (!text || !text.trim()) return [];
+    var matches = [];
+    var m;
+    NAME_LINK_RE.lastIndex = 0;
+    while ((m = NAME_LINK_RE.exec(text)) !== null) {
+      matches.push({ name: m[1].trim(), index: m.index, end: m.index + m[0].length });
+    }
+    if (!matches.length) return [];
+
+    var results = [];
+    for (var i = 0; i < matches.length; i++) {
+      var start = matches[i].end;
+      var end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+      var block = text.slice(start, end);
+      var lines = block.split("\n").map(function (l) { return l.trim(); });
+
+      var date = "";
+      var commentLines = [];
+      lines.forEach(function (line) {
+        if (!line) return;
+        if (DATE_LINE_RE.test(line) && !date) { date = parseDateFlexible(line) || ""; return; }
+        if (PHOTO_LINK_RE.test(line)) return;
+        PHOTO_LINK_RE.lastIndex = 0;
+        if (PURE_NUMBER_RE.test(line)) return;
+        if (CITY_STATE_RE.test(line)) return;
+        commentLines.push(line);
+      });
+
+      var comment = commentLines.join(" ")
+        .replace(/^\(+/, "")
+        .replace(/\)+$/, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+
+      results.push({ reviewer: matches[i].name, date: date, comment: comment, rating: "" });
+    }
+    return results;
   }
 
   // ---- Passcode gate ----
@@ -385,6 +477,18 @@
       bulkSel.dataset.filled = "1";
     }
     if (bulkSel && currentTab !== "All") bulkSel.value = currentTab;
+
+    var pasteSel = el("rt-paste-outlet");
+    if (pasteSel && !pasteSel.dataset.filled) {
+      OUTLETS.forEach(function (o) {
+        var opt = document.createElement("option");
+        opt.value = o;
+        opt.textContent = o;
+        pasteSel.appendChild(opt);
+      });
+      pasteSel.dataset.filled = "1";
+    }
+    if (pasteSel && currentTab !== "All") pasteSel.value = currentTab;
   }
 
   function filtered() {
@@ -584,6 +688,8 @@
 
     if (role === "editor") {
       el("rt-submit").addEventListener("click", addReview);
+      el("rt-paste-parse").addEventListener("click", parsePastedReviews);
+      el("rt-paste-submit").addEventListener("click", addParsedReviews);
       el("rt-bulk-submit").addEventListener("click", addBulkReviews);
       el("rt-refresh").addEventListener("click", function () { el("rt-live-text").textContent = "Live"; });
     }
@@ -625,6 +731,104 @@
     el("rt-reviewer").value = "";
     el("rt-comment").value = "";
     el("rt-date").value = todayStr();
+  }
+
+  // ---------------- PASTE-FROM-YELP/GOOGLE UI ----------------
+  function renderParsedRows() {
+    var wrap = el("rt-parsed-list");
+    wrap.innerHTML = "";
+    if (!parsedRows.length) {
+      el("rt-paste-submit").classList.add("rt-hidden");
+      return;
+    }
+    parsedRows.forEach(function (row, i) {
+      var card = document.createElement("div");
+      card.className = "rt-parsed-card";
+      card.innerHTML =
+        '<div class="rt-parsed-top">' +
+          '<input type="text" data-field="reviewer" data-idx="' + i + '" value="' + escapeHtml(row.reviewer) + '" placeholder="Reviewer name" />' +
+          '<input type="text" data-field="date" data-idx="' + i + '" value="' + escapeHtml(row.date) + '" placeholder="yyyy-mm-dd" />' +
+          '<input type="number" data-field="rating" data-idx="' + i + '" value="' + escapeHtml(row.rating) + '" min="0" max="5" step="0.5" placeholder="Rating" />' +
+        '</div>' +
+        '<textarea class="rt-parsed-comment" data-field="comment" data-idx="' + i + '">' + escapeHtml(row.comment) + '</textarea>' +
+        '<button class="rt-parsed-remove" data-idx="' + i + '">Remove this one</button>';
+      wrap.appendChild(card);
+    });
+    wrap.querySelectorAll("[data-field]").forEach(function (input) {
+      input.addEventListener("input", function () {
+        var idx = Number(input.getAttribute("data-idx"));
+        parsedRows[idx][input.getAttribute("data-field")] = input.value;
+      });
+    });
+    wrap.querySelectorAll(".rt-parsed-remove").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        parsedRows.splice(Number(btn.getAttribute("data-idx")), 1);
+        renderParsedRows();
+      });
+    });
+    el("rt-paste-submit").classList.remove("rt-hidden");
+  }
+
+  function parsePastedReviews() {
+    var errorEl = el("rt-paste-error");
+    var resultEl = el("rt-paste-result");
+    errorEl.textContent = "";
+    resultEl.textContent = "";
+    var text = el("rt-paste-text").value;
+    parsedRows = parseReviewBlob(text);
+    if (!parsedRows.length) {
+      errorEl.textContent = "Couldn't find a reviewer name/link in that text. Make sure you copied the reviewer's name as it links to their profile.";
+      renderParsedRows();
+      return;
+    }
+    renderParsedRows();
+  }
+
+  async function addParsedReviews() {
+    var outlet = el("rt-paste-outlet").value;
+    var source = el("rt-paste-source").value;
+    var errorEl = el("rt-paste-error");
+    var resultEl = el("rt-paste-result");
+    errorEl.textContent = "";
+    resultEl.textContent = "";
+
+    var invalid = [];
+    parsedRows.forEach(function (row, i) {
+      var r = Number(row.rating);
+      if (row.rating === "" || isNaN(r) || r < 0 || r > 5) invalid.push(i + 1);
+    });
+    if (invalid.length) {
+      errorEl.textContent = "Add a rating (0–5) for row" + (invalid.length === 1 ? "" : "s") + " " + invalid.join(", ") + " before adding.";
+      return;
+    }
+    if (!parsedRows.length) return;
+
+    try {
+      var batch = writeBatch(db);
+      parsedRows.forEach(function (row, i) {
+        var ref = doc(reviewsCol);
+        batch.set(ref, {
+          outlet: outlet,
+          source: source,
+          date: parseDateFlexible(row.date) || row.date || todayStr(),
+          rating: Number(row.rating),
+          reviewer: row.reviewer,
+          comment: row.comment,
+          createdAtMs: Date.now() + i,
+          createdAt: serverTimestamp()
+        });
+      });
+      await batch.commit();
+    } catch (e) {
+      errorEl.textContent = "Could not save. Check your connection and try again.";
+      console.error(e);
+      return;
+    }
+
+    resultEl.textContent = "Added " + parsedRows.length + (parsedRows.length === 1 ? " review." : " reviews.");
+    parsedRows = [];
+    el("rt-paste-text").value = "";
+    renderParsedRows();
   }
 
   async function addBulkReviews() {
