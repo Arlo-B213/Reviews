@@ -1,0 +1,367 @@
+<style>
+  :root {
+    --navy: #1F2A44;
+    --navy-light: #2C3B5C;
+    --gold: #C9A24B;
+    --gold-light: #FCEFD0;
+    --cream: #FAF8F3;
+    --ink: #23262B;
+    --muted: #6B6F76;
+    --line: #E4DFD3;
+    --danger: #A3352B;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .rt-app { font-family: -apple-system, "Segoe UI", Arial, sans-serif; color: var(--ink); background: var(--cream); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); position: relative; }
+  .rt-gate { padding: 60px 24px; text-align: center; }
+  .rt-gate h1 { color: var(--navy); font-size: 18px; margin: 0 0 6px; }
+  .rt-gate p { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+  .rt-gate input { font-size: 14px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 7px; width: 200px; text-align: center; }
+  .rt-gate button { margin-left: 8px; background: var(--navy); color: #fff; border: none; border-radius: 7px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .rt-gate button:hover { background: var(--navy-light); }
+  .rt-gate-error { color: var(--danger); font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+  .rt-hidden { display: none !important; }
+  .rt-header { background: var(--navy); color: #fff; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .rt-header h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: 0.2px; }
+  .rt-header p { margin: 4px 0 0; font-size: 12.5px; color: #C9CEDC; }
+  .rt-live { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--gold-light); }
+  .rt-dot { width: 7px; height: 7px; border-radius: 50%; background: #4CAF6D; }
+  .rt-tabs { display: flex; gap: 4px; padding: 10px 16px 0; background: var(--navy-light); overflow-x: auto; }
+  .rt-tab { flex: 0 0 auto; padding: 9px 14px; font-size: 13px; color: #D6DAE6; background: transparent; border: none; border-radius: 8px 8px 0 0; cursor: pointer; white-space: nowrap; }
+  .rt-tab:hover { background: rgba(255,255,255,0.08); }
+  .rt-tab.active { background: var(--cream); color: var(--navy); font-weight: 600; }
+  .rt-body { padding: 20px 24px 24px; }
+  .rt-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .rt-stat { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .rt-stat .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .rt-stat .value { font-size: 20px; font-weight: 600; color: var(--navy); margin-top: 2px; }
+  .rt-form { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 22px; }
+  .rt-form h2 { font-size: 14px; margin: 0 0 12px; color: var(--navy); font-weight: 600; }
+  .rt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .rt-field { display: flex; flex-direction: column; gap: 4px; }
+  .rt-field label { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .rt-field input, .rt-field select, .rt-field textarea {
+    font-family: inherit; font-size: 13.5px; padding: 8px 10px; border: 1px solid var(--line);
+    border-radius: 7px; background: var(--cream); color: var(--ink);
+  }
+  .rt-field textarea { resize: vertical; min-height: 56px; }
+  .rt-field input:focus, .rt-field select:focus, .rt-field textarea:focus {
+    outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-light);
+  }
+  .rt-error { font-size: 11.5px; color: var(--danger); min-height: 14px; }
+  .rt-submit { margin-top: 4px; background: var(--navy); color: #fff; border: none; border-radius: 7px;
+    padding: 9px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .rt-submit:hover { background: var(--navy-light); }
+  .rt-submit:active { transform: scale(0.98); }
+  .rt-list-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .rt-list-head h2 { font-size: 14px; color: var(--navy); margin: 0; font-weight: 600; }
+  .rt-refresh { background: none; border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .rt-refresh:hover { border-color: var(--gold); color: var(--navy); }
+  .rt-card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px; margin-bottom: 9px; }
+  .rt-card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .rt-stars { color: var(--gold); font-size: 13.5px; letter-spacing: 1px; }
+  .rt-rating-num { font-size: 12px; color: var(--muted); margin-left: 4px; }
+  .rt-badge { font-size: 10.5px; background: var(--gold-light); color: #7A5E1F; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .rt-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .rt-comment { font-size: 13.5px; color: var(--ink); margin-top: 7px; line-height: 1.5; }
+  .rt-del { background: none; border: none; color: var(--muted); font-size: 11.5px; cursor: pointer; padding: 0; text-decoration: underline; }
+  .rt-del:hover { color: var(--danger); }
+  .rt-empty { text-align: center; padding: 34px 12px; color: var(--muted); font-size: 13px; }
+  .rt-notice { font-size: 11.5px; color: var(--muted); margin-top: 14px; text-align: center; }
+  @media (max-width: 480px) { .rt-row { grid-template-columns: 1fr; } }
+</style>
+
+<div class="rt-app">
+  <div class="rt-gate" id="rt-gate">
+    <h1>Food court review tracker</h1>
+    <p>Enter the passcode to continue.</p>
+    <div>
+      <input type="password" id="rt-passcode" placeholder="Passcode" />
+      <button id="rt-gate-btn">Continue</button>
+    </div>
+    <div class="rt-gate-error" id="rt-gate-error"></div>
+  </div>
+
+  <div id="rt-main" class="rt-hidden">
+    <div class="rt-header">
+      <div>
+        <h1>Food court review tracker</h1>
+        <p>Pronto · Agave · American Classics · Pechanga Fried Chicken · Cafe Cocoa's · Little Wok · Portable Smart Bar</p>
+      </div>
+      <div class="rt-live"><span class="rt-dot"></span><span id="rt-live-text">Live</span></div>
+    </div>
+
+    <div class="rt-tabs" id="rt-tabs"></div>
+
+    <div class="rt-body">
+      <div class="rt-summary" id="rt-summary"></div>
+
+      <div class="rt-form">
+        <h2>Log a review</h2>
+        <div class="rt-row" id="rt-outlet-row">
+          <div class="rt-field">
+            <label for="rt-outlet">Outlet</label>
+            <select id="rt-outlet"></select>
+          </div>
+          <div class="rt-field">
+            <label for="rt-date">Date</label>
+            <input type="date" id="rt-date" />
+          </div>
+        </div>
+        <div class="rt-row">
+          <div class="rt-field">
+            <label for="rt-rating">Rating (0–5)</label>
+            <input type="number" id="rt-rating" min="0" max="5" step="0.5" placeholder="4.5" />
+          </div>
+          <div class="rt-field">
+            <label for="rt-reviewer">Reviewer name</label>
+            <input type="text" id="rt-reviewer" placeholder="Jamie R." />
+          </div>
+        </div>
+        <div class="rt-field" style="margin-bottom: 6px;">
+          <label for="rt-comment">What they said</label>
+          <textarea id="rt-comment" placeholder="Fast service, friendly staff..."></textarea>
+        </div>
+        <div class="rt-error" id="rt-error"></div>
+        <button class="rt-submit" id="rt-submit">Add review</button>
+      </div>
+
+      <div class="rt-list-head">
+        <h2 id="rt-list-title">All reviews</h2>
+        <button class="rt-refresh" id="rt-refresh">Refresh</button>
+      </div>
+      <div id="rt-list"></div>
+      <p class="rt-notice">Synced live via Firebase. Anyone who has the passcode and this file can view and add reviews.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  // ---- EDIT THIS to change the shared passcode ----
+  var PASSCODE = "foodcourt2026";
+
+  var firebaseConfig = {
+    apiKey: "AIzaSyCs6_YRPZsGDkb4hUFU4uVvfwyN9gPKUDg",
+    authDomain: "soft-skills-f6ae0.firebaseapp.com",
+    projectId: "soft-skills-f6ae0",
+    storageBucket: "soft-skills-f6ae0.firebasestorage.app",
+    messagingSenderId: "25790648095",
+    appId: "1:25790648095:web:3a1ef1946901bd71302a2a"
+  };
+
+  var app = initializeApp(firebaseConfig);
+  var db = getFirestore(app);
+  var reviewsCol = collection(db, "reviews");
+
+  var OUTLETS = ["Pronto", "Agave", "American Classics", "Pechanga Fried Chicken", "Cafe Cocoa's", "Little Wok", "Portable Smart Bar"];
+  var currentTab = "All";
+  var reviews = [];
+
+  function el(id) { return document.getElementById(id); }
+
+  function todayStr() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  // ---- Passcode gate ----
+  el("rt-gate-btn").addEventListener("click", checkPasscode);
+  el("rt-passcode").addEventListener("keydown", function (e) { if (e.key === "Enter") checkPasscode(); });
+
+  function checkPasscode() {
+    var entered = el("rt-passcode").value;
+    if (entered === PASSCODE) {
+      el("rt-gate").classList.add("rt-hidden");
+      el("rt-main").classList.remove("rt-hidden");
+      startApp();
+    } else {
+      el("rt-gate-error").textContent = "That passcode isn't right. Try again.";
+    }
+  }
+
+  // ---- App logic ----
+  function renderTabs() {
+    var wrap = el("rt-tabs");
+    wrap.innerHTML = "";
+    ["All"].concat(OUTLETS).forEach(function (name) {
+      var b = document.createElement("button");
+      b.className = "rt-tab" + (name === currentTab ? " active" : "");
+      b.textContent = name;
+      b.onclick = function () { currentTab = name; renderAll(); };
+      wrap.appendChild(b);
+    });
+  }
+
+  function renderOutletSelect() {
+    var sel = el("rt-outlet");
+    sel.innerHTML = "";
+    OUTLETS.forEach(function (o) {
+      var opt = document.createElement("option");
+      opt.value = o;
+      opt.textContent = o;
+      sel.appendChild(opt);
+    });
+    if (currentTab !== "All") {
+      sel.value = currentTab;
+      el("rt-outlet-row").style.display = "none";
+    } else {
+      el("rt-outlet-row").style.display = "grid";
+    }
+  }
+
+  function filtered() {
+    if (currentTab === "All") return reviews.slice();
+    return reviews.filter(function (r) { return r.outlet === currentTab; });
+  }
+
+  function starString(rating) {
+    var full = Math.floor(rating);
+    var half = rating - full >= 0.5;
+    var str = "";
+    for (var i = 0; i < full; i++) str += "\u2605";
+    if (half) str += "\u00BD";
+    var remaining = 5 - full - (half ? 1 : 0);
+    for (var j = 0; j < remaining; j++) str += "\u2606";
+    return str;
+  }
+
+  function renderSummary() {
+    var wrap = el("rt-summary");
+    wrap.innerHTML = "";
+    var groups = currentTab === "All" ? OUTLETS : [currentTab];
+    groups.forEach(function (outlet) {
+      var list = reviews.filter(function (r) { return r.outlet === outlet; });
+      var avg = list.length ? (list.reduce(function (s, r) { return s + Number(r.rating); }, 0) / list.length) : null;
+      var card = document.createElement("div");
+      card.className = "rt-stat";
+      card.innerHTML =
+        '<div class="label">' + outlet + '</div>' +
+        '<div class="value">' + (avg === null ? "—" : avg.toFixed(1)) + '</div>' +
+        '<div class="rt-meta" style="margin-top:0;">' + list.length + (list.length === 1 ? " review" : " reviews") + '</div>';
+      wrap.appendChild(card);
+    });
+  }
+
+  function renderList() {
+    var listEl = el("rt-list");
+    var data = filtered().slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || "") || (b._order - a._order); });
+    el("rt-list-title").textContent = (currentTab === "All" ? "All reviews" : currentTab + " reviews") + " (" + data.length + ")";
+    listEl.innerHTML = "";
+    if (!data.length) {
+      var empty = document.createElement("div");
+      empty.className = "rt-empty";
+      empty.textContent = "No reviews logged yet. Add the first one above.";
+      listEl.appendChild(empty);
+      return;
+    }
+    data.forEach(function (r) {
+      var card = document.createElement("div");
+      card.className = "rt-card";
+      var dateDisplay = r.date ? new Date(r.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+      card.innerHTML =
+        '<div class="rt-card-top">' +
+          '<div><span class="rt-stars">' + starString(Number(r.rating)) + '</span><span class="rt-rating-num">' + Number(r.rating).toFixed(1) + '</span></div>' +
+          (currentTab === "All" ? '<span class="rt-badge">' + r.outlet + '</span>' : '') +
+        '</div>' +
+        '<div class="rt-meta">' + (r.reviewer || "Anonymous") + (dateDisplay ? " · " + dateDisplay : "") + '</div>' +
+        (r.comment ? '<div class="rt-comment">' + escapeHtml(r.comment) + '</div>' : '') +
+        '<div style="margin-top:8px;"><button class="rt-del" data-id="' + r.id + '">Delete</button></div>';
+      listEl.appendChild(card);
+    });
+    listEl.querySelectorAll(".rt-del").forEach(function (btn) {
+      btn.addEventListener("click", function () { deleteReview(btn.getAttribute("data-id")); });
+    });
+  }
+
+  function escapeHtml(s) {
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function renderAll() {
+    renderTabs();
+    renderOutletSelect();
+    renderSummary();
+    renderList();
+  }
+
+  function startApp() {
+    el("rt-date").value = todayStr();
+    renderOutletSelect();
+
+    onSnapshot(reviewsCol, function (snapshot) {
+      reviews = snapshot.docs.map(function (d, i) {
+        var data = d.data();
+        return {
+          id: d.id,
+          outlet: data.outlet,
+          date: data.date,
+          rating: data.rating,
+          reviewer: data.reviewer,
+          comment: data.comment,
+          _order: data.createdAtMs || i
+        };
+      });
+      renderAll();
+      el("rt-live-text").textContent = "Live";
+    }, function (err) {
+      el("rt-live-text").textContent = "Connection issue";
+      console.error("Firestore error:", err);
+    });
+
+    el("rt-submit").addEventListener("click", addReview);
+    el("rt-refresh").addEventListener("click", function () { el("rt-live-text").textContent = "Live"; });
+  }
+
+  async function addReview() {
+    var outlet = el("rt-outlet").value;
+    var dateVal = el("rt-date").value || todayStr();
+    var ratingVal = el("rt-rating").value;
+    var reviewer = el("rt-reviewer").value.trim();
+    var comment = el("rt-comment").value.trim();
+    var errorEl = el("rt-error");
+    errorEl.textContent = "";
+
+    if (ratingVal === "" || isNaN(Number(ratingVal)) || Number(ratingVal) < 0 || Number(ratingVal) > 5) {
+      errorEl.textContent = "Enter a rating between 0 and 5.";
+      return;
+    }
+
+    try {
+      await addDoc(reviewsCol, {
+        outlet: outlet,
+        date: dateVal,
+        rating: Number(ratingVal),
+        reviewer: reviewer,
+        comment: comment,
+        createdAtMs: Date.now(),
+        createdAt: serverTimestamp()
+      });
+    } catch (e) {
+      errorEl.textContent = "Could not save. Check your connection and try again.";
+      console.error(e);
+      return;
+    }
+
+    el("rt-rating").value = "";
+    el("rt-reviewer").value = "";
+    el("rt-comment").value = "";
+    el("rt-date").value = todayStr();
+  }
+
+  async function deleteReview(id) {
+    try {
+      await deleteDoc(doc(db, "reviews", id));
+    } catch (e) {
+      console.error(e);
+    }
+  }
+</script>
