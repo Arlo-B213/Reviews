@@ -191,8 +191,12 @@
 
         <div class="rt-list-head">
           <h2 id="rt-list-title">All reviews</h2>
-          <button class="rt-refresh" id="rt-refresh">Refresh</button>
+          <div style="display:flex; gap:8px;">
+            <button class="rt-refresh" id="rt-dedupe">Remove duplicates</button>
+            <button class="rt-refresh" id="rt-refresh">Refresh</button>
+          </div>
         </div>
+        <div class="rt-meta" id="rt-dedupe-result" style="margin-bottom: 8px;"></div>
         <div id="rt-list"></div>
         <p class="rt-notice" id="rt-notice-editor">Synced live via Firebase. Anyone with the editor passcode can add or delete reviews.</p>
       </div>
@@ -241,7 +245,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import {
-    getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp, writeBatch
+    getFirestore, collection, deleteDoc, doc, setDoc, onSnapshot, serverTimestamp, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
   // ---- EDIT THESE to change the shared passcodes ----
@@ -325,6 +329,31 @@
       if (FILENAME_OUTLET_MAP[i].pattern.test(base)) return FILENAME_OUTLET_MAP[i].outlet;
     }
     return OUTLETS[0];
+  }
+
+  // Small, fast, non-cryptographic hash — good enough to fingerprint review content for dedup.
+  function hashStr(s) {
+    var h = 0;
+    for (var i = 0; i < s.length; i++) {
+      h = (h << 5) - h + s.charCodeAt(i);
+      h |= 0;
+    }
+    return (h >>> 0).toString(36);
+  }
+
+  // A stable ID for a review: uses the source's own review id when we have one (from a CSV
+  // export), otherwise a fingerprint of its content. Either way, saving the "same" review twice
+  // overwrites the same document instead of creating a duplicate.
+  function reviewDocId(source, outlet, date, reviewer, comment, externalId) {
+    var srcKey = (source || "misc").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (externalId) return srcKey + "_" + externalId.replace(/[^a-zA-Z0-9_-]/g, "");
+    return srcKey + "_" + hashStr([outlet, date, (reviewer || "").toLowerCase().trim(), (comment || "").toLowerCase().trim()].join("|"));
+  }
+
+  // Same fingerprint, computed from a review already loaded from Firestore — used to spot
+  // duplicates that got in before dedup existed (e.g. imported with random IDs).
+  function reviewContentKey(r) {
+    return [(r.source || "").toLowerCase(), r.outlet, r.date, (r.reviewer || "").toLowerCase().trim(), (r.comment || "").toLowerCase().trim()].join("|");
   }
 
   // ---- Passcode gate ----
@@ -604,6 +633,7 @@
       el("rt-submit").addEventListener("click", addReview);
       el("rt-csv-input").addEventListener("change", handleCsvFilesSelected);
       el("rt-csv-submit").addEventListener("click", importAllCsvFiles);
+      el("rt-dedupe").addEventListener("click", removeDuplicateReviews);
       el("rt-refresh").addEventListener("click", function () { el("rt-live-text").textContent = "Live"; });
     }
   }
@@ -624,7 +654,8 @@
     }
 
     try {
-      await addDoc(reviewsCol, {
+      var id = reviewDocId(source, outlet, dateVal, reviewer, comment, "");
+      await setDoc(doc(reviewsCol, id), {
         outlet: outlet,
         source: source,
         date: dateVal,
@@ -664,7 +695,8 @@
     var date = parseDateFlexible(dateRaw) || todayStr();
     var reviewer = (row["Review Author"] !== undefined ? row["Review Author"] : row["Reviewer"]) || "";
     var comment = (row["Review Text"] !== undefined ? row["Review Text"] : row["Comments"]) || "";
-    return { date: date, rating: rating, reviewer: reviewer.trim(), comment: comment.trim() };
+    var externalId = row["id"] || row["Id"] || row["ID"] || "";
+    return { date: date, rating: rating, reviewer: reviewer.trim(), comment: comment.trim(), externalId: externalId };
   }
 
   async function handleCsvFilesSelected(e) {
@@ -738,7 +770,7 @@
     var allRows = [];
     csvFiles.forEach(function (entry) {
       entry.rows.forEach(function (row) {
-        allRows.push({ outlet: entry.outlet, source: source, date: row.date, rating: row.rating, reviewer: row.reviewer, comment: row.comment });
+        allRows.push({ outlet: entry.outlet, source: source, date: row.date, rating: row.rating, reviewer: row.reviewer, comment: row.comment, externalId: row.externalId });
       });
     });
 
@@ -755,7 +787,8 @@
         var batch = writeBatch(db);
         var chunk = allRows.slice(start, start + CHUNK);
         chunk.forEach(function (row, i) {
-          var ref = doc(reviewsCol);
+          var id = reviewDocId(row.source, row.outlet, row.date, row.reviewer, row.comment, row.externalId);
+          var ref = doc(reviewsCol, id);
           batch.set(ref, {
             outlet: row.outlet,
             source: row.source,
@@ -777,7 +810,7 @@
       return;
     }
 
-    resultEl.textContent = "Imported " + allRows.length + (allRows.length === 1 ? " review" : " reviews") + " from " + csvFiles.length + " file" + (csvFiles.length === 1 ? "" : "s") + ".";
+    resultEl.textContent = "Imported " + allRows.length + (allRows.length === 1 ? " review" : " reviews") + " from " + csvFiles.length + " file" + (csvFiles.length === 1 ? "" : "s") + ". Re-uploading the same file won't create duplicates.";
     csvFiles = [];
     renderCsvFileList();
     submitBtn.disabled = false;
@@ -790,5 +823,43 @@
     } catch (e) {
       console.error(e);
     }
+  }
+
+  async function removeDuplicateReviews() {
+    var resultEl = el("rt-dedupe-result");
+    var btn = el("rt-dedupe");
+    var seen = {};
+    var toDelete = [];
+    // reviews is already sorted by nothing in particular; sort by _order so we keep the earliest of each group.
+    reviews.slice().sort(function (a, b) { return a._order - b._order; }).forEach(function (r) {
+      var key = reviewContentKey(r);
+      if (seen[key]) toDelete.push(r.id);
+      else seen[key] = true;
+    });
+
+    if (!toDelete.length) {
+      resultEl.textContent = "No duplicates found.";
+      return;
+    }
+
+    btn.disabled = true;
+    var original = btn.textContent;
+    btn.textContent = "Removing...";
+    try {
+      var CHUNK = 400;
+      for (var start = 0; start < toDelete.length; start += CHUNK) {
+        var batch = writeBatch(db);
+        toDelete.slice(start, start + CHUNK).forEach(function (id) {
+          batch.delete(doc(db, "reviews", id));
+        });
+        await batch.commit();
+      }
+      resultEl.textContent = "Removed " + toDelete.length + (toDelete.length === 1 ? " duplicate review." : " duplicate reviews.");
+    } catch (e) {
+      resultEl.textContent = "Could not remove duplicates. Check your connection and try again.";
+      console.error(e);
+    }
+    btn.disabled = false;
+    btn.textContent = original;
   }
 </script>
