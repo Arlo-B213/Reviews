@@ -122,19 +122,19 @@
   .trend-avg{font-family:var(--font-mono); font-size:11px; color:var(--ink-mute); flex:none;}
   .trend-svg{width:100%; height:44px; display:block;}
 
-  .volume-panel{padding:16px 18px 10px;}
-  .volume-svg{width:100%; height:180px; display:block; overflow:visible;}
-  .volume-legend{display:flex; flex-wrap:wrap; gap:12px; padding:10px 2px 2px; font-size:10.5px; color:var(--ink-mute);}
-  .volume-legend span{display:inline-flex; align-items:center; gap:5px;}
-
-  .dist-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px;}
-  @media (max-width:560px){ .dist-grid{grid-template-columns:1fr 1fr;} }
-  .dist-cell{display:flex; flex-direction:column; gap:6px;}
-  .dist-name{font-size:11px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .dist-bars{display:flex; align-items:flex-end; gap:4px; height:52px;}
-  .dist-bar-col{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:3px;}
-  .dist-bar{width:100%; border-radius:2px 2px 0 0; min-height:2px;}
-  .dist-bar-label{font-family:var(--font-mono); font-size:9px; color:var(--ink-mute);}
+  /* ---------- word clusters ---------- */
+  .wordcloud-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:760px){ .wordcloud-grid{grid-template-columns:1fr;} }
+  .wordcloud-panel{padding:26px 28px 28px;}
+  .pos-panel{background:color-mix(in srgb, var(--good) 5%, var(--surface));}
+  .neg-panel{background:color-mix(in srgb, var(--critical) 5%, var(--surface));}
+  .wordcloud-panel h3{font-family:var(--font-display); font-size:16px; font-weight:700; margin:0 0 4px;}
+  .wc-sub{font-size:12px; color:var(--ink-mute); margin:0 0 20px;}
+  .wc-flow{display:flex; flex-wrap:wrap; align-items:baseline; gap:7px 16px; min-height:40px;}
+  .wc-word{font-family:var(--font-display); font-weight:700; cursor:default; white-space:nowrap; line-height:1.15;}
+  .wc-word.pos{color:var(--good);}
+  .wc-word.neg{color:var(--critical);}
+  .wc-empty{font-size:12.5px; color:var(--ink-mute); font-style:italic;}
 
   .compare-panel{padding:4px;}
   .compare-table{width:100%; border-collapse:collapse; font-size:13px; min-width:640px;}
@@ -275,6 +275,25 @@
     </div>
   </header>
 
+  <section class="wordclusters" aria-label="Word clusters">
+    <div class="section-head">
+      <h2>Word Clusters</h2>
+      <p>Words used disproportionately more in 4–5★ reviews vs. 1–2★ reviews · sized by frequency</p>
+    </div>
+    <div class="wordcloud-grid">
+      <div class="panel wordcloud-panel pos-panel">
+        <h3>😊 What's Working</h3>
+        <p class="wc-sub">Words that show up far more often in glowing reviews</p>
+        <div class="wc-flow" id="posCloud"></div>
+      </div>
+      <div class="panel wordcloud-panel neg-panel">
+        <h3>😠 What's Not</h3>
+        <p class="wc-sub">Words that show up far more often in low-star complaints</p>
+        <div class="wc-flow" id="negCloud"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="signal" aria-label="Coaching signal">
     <div class="section-head">
       <h2>Coaching Signal</h2>
@@ -298,16 +317,6 @@
       <div>
         <div class="section-head"><h2>Rating Trend</h2><p>Average rating by year</p></div>
         <div class="panel trend-panel"><div class="trend-grid" id="trendGrid"></div></div>
-      </div>
-    </div>
-    <div class="chart-grid" style="margin-top:16px;">
-      <div>
-        <div class="section-head"><h2>Review Volume</h2><p>Reviews per month, by kitchen</p></div>
-        <div class="panel volume-panel"><svg class="volume-svg" id="volumeChart" preserveAspectRatio="none"></svg></div>
-      </div>
-      <div>
-        <div class="section-head"><h2>Star Distribution</h2><p>1–5★ breakdown by kitchen</p></div>
-        <div class="panel trend-panel"><div class="dist-grid" id="distGrid"></div></div>
       </div>
     </div>
   </section>
@@ -563,81 +572,57 @@ function bestExample(skill, sentiment){
   grid.innerHTML = html;
 })();
 
-// ---- review volume by month (stacked bar) ----
-(function(){
-  const svg = document.getElementById("volumeChart");
-  const months = [];
-  const cursor = new Date(windowCutoff.getFullYear(), windowCutoff.getMonth(), 1);
-  const end = new Date();
-  while(cursor <= end){
-    months.push(`${cursor.getFullYear()}-${String(cursor.getMonth()+1).padStart(2,'0')}`);
-    cursor.setMonth(cursor.getMonth()+1);
-  }
-  const counts = months.map(m => {
-    const row = {month:m};
-    BIZ_ORDER.forEach(biz=> row[biz] = DATA.filter(r=>r.business===biz && r.date.slice(0,7)===m).length);
-    return row;
-  });
-  const maxTotal = Math.max(1, ...counts.map(c=>BIZ_ORDER.reduce((a,biz)=>a+c[biz],0)));
-  const W = 720, H = 170, padL = 22, padB = 18, padT = 6;
-  const barGap = 4;
-  const chartW = W - padL - 4;
-  const barW = (chartW - barGap*(months.length-1)) / Math.max(1,months.length);
-  const FONT = "'JetBrains Mono', ui-monospace, monospace";
-  let gridlines = "";
-  const ticks = 3;
-  for(let t=0;t<=ticks;t++){
-    const v = Math.round(maxTotal * t/ticks);
-    const y = H - padB - (v/maxTotal)*(H-padB-padT);
-    gridlines += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
-    gridlines += `<text x="${(padL-6).toFixed(1)}" y="${(y+3).toFixed(1)}" text-anchor="end" font-family="${FONT}" font-size="9" fill="var(--ink-mute)">${v}</text>`;
-  }
-  let bars = "";
-  counts.forEach((c, i)=>{
-    const x = padL + i*(barW+barGap);
-    let yCursor = H - padB;
-    BIZ_ORDER.forEach(biz=>{
-      const v = c[biz];
-      if(v<=0) return;
-      const h = (v/maxTotal)*(H-padB-padT);
-      yCursor -= h;
-      bars += `<rect x="${x.toFixed(1)}" y="${yCursor.toFixed(1)}" width="${Math.max(0,barW).toFixed(1)}" height="${h.toFixed(1)}" fill="${BIZ_COLOR[biz]}"/>`;
-    });
-    if(i % 2 === 0 || months.length<=9){
-      const [yy,mm] = c.month.split('-');
-      const label = new Date(+yy, +mm-1, 1).toLocaleDateString('en-US',{month:'short'});
-      bars += `<text x="${(x+barW/2).toFixed(1)}" y="${H-4}" text-anchor="middle" font-family="${FONT}" font-size="8.5" fill="var(--ink-mute)">${label}</text>`;
-    }
-  });
-  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  svg.innerHTML = gridlines + bars;
+// ---- word clusters: words disproportionately common in high vs. low star reviews ----
+const WORD_STOPWORDS = new Set(`the a an and or but is was were are be been being this that these those it its it's they them their
+  we us our you your youre i my me he she his her him not no yes so if then than as at by for from in into of on to with without
+  about over under again further out up down here there all any both each few more most other some such only own same than too
+  very can will just also really got get one two went go going came come back would could should still even like place food
+  restaurant service order ordered ordering time had have has did do does doesn didn don t s d ll m re ve dont didnt cant
+  couldnt wouldnt shouldnt wasnt isnt arent hadnt hasnt havent wont pechanga court casino resort temecula located location
+  seating little lot half line night big use used using try tried which always definitely maybe pretty kind sort many much
+  lots bit way put took take let make made getting called asked told said tell say saying went comes seemed felt feel find
+  found looked look looking wanted want needed need know knew think thought thing things stuff someone something everyone
+  everything nothing anyone else instead across around every day days week weeks month months year years times first last
+  next another other ok okay well actually literally basically honestly obviously totally super rather somewhat somehow
+  anyway anyways though although however therefore since because while whether when where why who whom whose what whatever
+  wherever whenever ive weve theyve youve hes shes whats thats theres heres wheres hows whys mine yours ours theirs decided
+  stopped right bear eat either paid cost cut mac away`.trim().split(/\s+/));
 
-  const legend = document.createElement("div");
-  legend.className = "volume-legend";
-  legend.innerHTML = BIZ_ORDER.map(biz=>`<span><span class="dot" style="background:${BIZ_COLOR[biz]}"></span>${biz}</span>`).join("");
-  svg.parentElement.appendChild(legend);
-})();
+function tokenizeReview(text){
+  return text.toLowerCase().replace(/[’]/g,"'").replace(/[^a-z\s']/g,' ').split(/\s+/)
+    .map(w=>w.replace(/^'+|'+$/g,''))
+    .filter(w=>w.length>2 && !w.includes("'") && !WORD_STOPWORDS.has(w));
+}
 
-// ---- star distribution small multiples ----
 (function(){
-  const grid = document.getElementById("distGrid");
-  let html = "";
-  BIZ_ORDER.forEach(biz=>{
-    const dist = agg[biz].dist;
-    const max = Math.max(1, ...[1,2,3,4,5].map(s=>dist[s]));
-    html += `<div class="dist-cell">
-      <div class="dist-name"><span class="dot" style="background:${BIZ_COLOR[biz]}"></span> ${biz}</div>
-      <div class="dist-bars">
-        ${[1,2,3,4,5].map(s=>`
-          <div class="dist-bar-col">
-            <div class="dist-bar-label">${dist[s]}</div>
-            <div class="dist-bar" style="height:${Math.max(4,(dist[s]/max*100))}%; background:${STAR_COLOR[s]}"></div>
-          </div>
-        `).join("")}
-      </div>
-    </div>`;
-  });
-  grid.innerHTML = html;
+  const posReviews = DATA.filter(r=>r.stars>=4), negReviews = DATA.filter(r=>r.stars<=2);
+  const posCounts={}, negCounts={};
+  posReviews.forEach(r=>tokenizeReview(r.review).forEach(w=>posCounts[w]=(posCounts[w]||0)+1));
+  negReviews.forEach(r=>tokenizeReview(r.review).forEach(w=>negCounts[w]=(negCounts[w]||0)+1));
+  const posTotal = Object.values(posCounts).reduce((a,b)=>a+b,0) || 1;
+  const negTotal = Object.values(negCounts).reduce((a,b)=>a+b,0) || 1;
+  const allWords = new Set([...Object.keys(posCounts), ...Object.keys(negCounts)]);
+  const scored = [...allWords].map(w=>{
+    const pc = posCounts[w]||0, nc = negCounts[w]||0;
+    return {w, pc, nc, total: pc+nc, diff: (pc/posTotal) - (nc/negTotal)};
+  }).filter(x=>x.total>=3);
+
+  const topPos = scored.filter(x=>x.diff>0).sort((a,b)=>b.diff-a.diff).slice(0,24);
+  const topNeg = scored.filter(x=>x.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,24);
+
+  function renderCloud(elId, words, cls){
+    const el = document.getElementById(elId);
+    if(!words.length){ el.innerHTML = `<span class="wc-empty">Not enough review text yet to find a pattern here.</span>`; return; }
+    const maxCount = Math.max(...words.map(x=>x.total));
+    const minSize = 13, maxSize = 34;
+    el.innerHTML = words.map(x=>{
+      const size = minSize + Math.sqrt(x.total/maxCount) * (maxSize-minSize);
+      const count = cls==="pos" ? x.pc : x.nc;
+      return `<span class="wc-word ${cls}" style="font-size:${size.toFixed(1)}px" title="${x.w} — used in ${count} review${count===1?'':'s'}">${x.w}</span>`;
+    }).join("");
+  }
+  renderCloud("posCloud", topPos, "pos");
+  renderCloud("negCloud", topNeg, "neg");
 })();
 
 // ---- then vs. now comparison table ----
