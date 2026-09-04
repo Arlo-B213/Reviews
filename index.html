@@ -454,31 +454,45 @@ function fmtDate(iso){ const d = new Date(iso+"T00:00:00"); return d.toLocaleDat
 function fmtMonthYear(iso){ const d=new Date(iso+"T00:00:00"); return d.toLocaleDateString("en-US",{month:"short",year:"numeric"}); }
 function escapeHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
-// annotate each review with matched skills once
-for(const r of DATA){
+// annotate every review with matched skills once (DATA and PRIOR_DATA share these same object
+// references since they're just filter()s of DATA_ALL, so annotating DATA_ALL covers all three)
+for(const r of DATA_ALL){
   r._skills = matchSkills(r.review);
   r._sent = r.stars>=4 ? "pos" : r.stars<=2 ? "neg" : "neu";
 }
 
-// ---- aggregate per business ----
-const agg = {};
-for(const biz of BIZ_ORDER){
-  const rows = DATA.filter(r=>r.business===biz);
-  const avg = rows.length ? rows.reduce((a,r)=>a+r.stars,0)/rows.length : 0;
-  const dist = {1:0,2:0,3:0,4:0,5:0};
-  rows.forEach(r=>dist[r.stars]++);
-  const dates = rows.map(r=>r.date).sort();
-  if(!dates.length) dates.push("—");
-  const skillCounts = {};
-  SKILL_NAMES.forEach(s=>skillCounts[s]={pos:0,neg:0});
-  rows.forEach(r=>r._skills.forEach(s=>{ if(r._sent==="pos") skillCounts[s].pos++; else if(r._sent==="neg") skillCounts[s].neg++; }));
-  agg[biz] = {rows, avg, dist, count:rows.length, first:dates[0], last:dates[dates.length-1], skillCounts};
+function aggregateByBusiness(rowSet){
+  const out = {};
+  for(const biz of BIZ_ORDER){
+    const rows = rowSet.filter(r=>r.business===biz);
+    const avg = rows.length ? rows.reduce((a,r)=>a+r.stars,0)/rows.length : 0;
+    const dist = {1:0,2:0,3:0,4:0,5:0};
+    rows.forEach(r=>dist[r.stars]++);
+    const dates = rows.map(r=>r.date).sort();
+    if(!dates.length) dates.push("—");
+    const skillCounts = {};
+    SKILL_NAMES.forEach(s=>skillCounts[s]={pos:0,neg:0});
+    rows.forEach(r=>r._skills.forEach(s=>{ if(r._sent==="pos") skillCounts[s].pos++; else if(r._sent==="neg") skillCounts[s].neg++; }));
+    out[biz] = {rows, avg, dist, count:rows.length, first:dates[0], last:dates[dates.length-1], skillCounts};
+  }
+  return out;
 }
 
+// ---- aggregate per business ----
+// `agg` is scoped to the rolling 18-month window (Overview page's analytics).
+// `aggAll` covers every review ever scraped (the Full Ledger page browses this, not the window).
+const agg = aggregateByBusiness(DATA);
+const aggAll = aggregateByBusiness(DATA_ALL);
+
 // ---- global skill totals ----
-const globalSkill = {};
-SKILL_NAMES.forEach(s=>globalSkill[s]={pos:0,neg:0});
-DATA.forEach(r=>r._skills.forEach(s=>{ if(r._sent==="pos") globalSkill[s].pos++; else if(r._sent==="neg") globalSkill[s].neg++; }));
+function globalSkillTotals(rowSet){
+  const out = {};
+  SKILL_NAMES.forEach(s=>out[s]={pos:0,neg:0});
+  rowSet.forEach(r=>r._skills.forEach(s=>{ if(r._sent==="pos") out[s].pos++; else if(r._sent==="neg") out[s].neg++; }));
+  return out;
+}
+const globalSkill = globalSkillTotals(DATA);       // 18-month window (Overview page)
+const globalSkillAll = globalSkillTotals(DATA_ALL); // all-time (Full Ledger page)
 
 // ---- word clusters: words disproportionately common in high vs. low star reviews ----
 const WORD_STOPWORDS = new Set(`the a an and or but is was were are be been being this that these those it its it's they them their
