@@ -1,4 +1,4 @@
-<title>Food Court, Tallied</title>
+<title>Full Ledger — Food Court, Tallied</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -262,98 +262,58 @@
   }
 
 
-  .nav-cta{
-    display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
-    padding:22px 26px; background:var(--accent); border-radius:16px; text-decoration:none;
+  .back-link{
+    font-family:var(--font-mono); font-size:11.5px; font-weight:600; color:var(--accent); text-decoration:none;
+    display:inline-flex; align-items:center; gap:5px; margin-bottom:10px;
   }
-  .nav-cta-text{display:flex; flex-direction:column; gap:3px;}
-  .nav-cta-text b{font-family:var(--font-display); font-weight:700; font-size:17px; color:var(--on-accent);}
-  .nav-cta-text span{font-size:12.5px; color:var(--on-accent); opacity:.85;}
-  .nav-cta-arrow{font-family:var(--font-display); font-weight:700; font-size:22px; color:var(--on-accent); flex:none;}
-  .nav-cta:hover{opacity:.94;}
-  .nav-cta:focus-visible{outline:2px solid var(--on-accent); outline-offset:3px;}
+  .back-link:hover{text-decoration:underline;}
+  .ledger-masthead h1{font-size:clamp(26px,4vw,38px);}
 
-  @media print{ .nav-cta{display:none !important;} }
+  @media print{ .back-link{display:none !important;} }
 </style>
 
 <div class="page">
-  <header class="masthead">
-    <p class="eyebrow">Yelp review dashboard · Temecula, CA</p>
-    <h1>Food Court, <em>Tallied</em></h1>
-    <p class="dek">Yelp reviews from the past 18 months across the food court's six kitchens, scored, charted, and mapped onto the same coaching categories used on the floor — so a Yelp complaint and a coaching note can point at the same thing.</p>
-    <div class="kpi-row">
-      <div class="kpi"><b id="statTotal">–</b><span>Reviews tallied</span></div>
-      <div class="kpi"><b id="statAvg">–</b><span>Ledger average</span></div>
-      <div class="kpi"><b id="statSpan">–</b><span>Window covered</span></div>
-      <div class="kpi"><b id="statPos">–</b><span>Compliment signals</span></div>
-      <div class="kpi"><b id="statNeg">–</b><span>Coaching signals</span></div>
-    </div>
+  <header class="masthead ledger-masthead">
+    <a class="back-link" href="index.html">← Food Court, Tallied</a>
+    <h1>Full <em>Ledger</em></h1>
+    <p class="dek">Every review from the past 18 months across the food court's six kitchens — search it, filter it, or export it.</p>
   </header>
 
-  <section class="wordclusters" aria-label="Word clusters">
-    <div class="section-head">
-      <h2>Word Clusters</h2>
-      <p>Words used disproportionately more in 4–5★ reviews vs. 1–2★ reviews · sized by frequency</p>
+  <section class="controls" aria-label="Filters">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="search" id="search" placeholder="Search review text…" aria-label="Search review text">
     </div>
-    <div class="wordcloud-grid">
-      <div class="panel wordcloud-panel pos-panel">
-        <h3>😊 What's Working</h3>
-        <p class="wc-sub">Words that show up far more often in glowing reviews</p>
-        <div class="wc-flow" id="posCloud"></div>
-      </div>
-      <div class="panel wordcloud-panel neg-panel">
-        <h3>😠 What's Not</h3>
-        <p class="wc-sub">Words that show up far more often in low-star complaints</p>
-        <div class="wc-flow" id="negCloud"></div>
-      </div>
-    </div>
+    <div class="chip-row" id="starChips" role="group" aria-label="Filter by star rating"></div>
+    <div class="chip-divider"></div>
+    <div class="chip-row" id="skillChips" role="group" aria-label="Filter by skill category"></div>
+    <select id="sortSelect" aria-label="Sort reviews">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="highest">Highest rated</option>
+      <option value="lowest">Lowest rated</option>
+    </select>
   </section>
 
-  <section class="signal" aria-label="Coaching signal">
-    <div class="section-head">
-      <h2>Coaching Signal</h2>
-      <p>What reviews praise vs. flag, by skill category · all 6 kitchens combined</p>
-    </div>
-    <div class="signal-grid">
-      <div class="panel signal-chart" id="signalChart"></div>
-      <div class="highlight-col">
-        <div class="panel highlight-card" id="aboveBeyond"></div>
-        <div class="panel highlight-card" id="needsCoaching"></div>
-      </div>
-    </div>
+  <section class="cards-section" aria-label="Restaurants">
+    <div class="section-head"><h2>Food Court</h2><p>Click a card to filter the ledger below</p></div>
+    <div class="cards" id="cardGrid"></div>
   </section>
 
-  <section class="charts" aria-label="Charts">
-    <div class="chart-grid">
-      <div>
-        <div class="section-head"><h2>The Lineup</h2><p>Average rating, 0–5 scale</p></div>
-        <div class="panel lineup-panel" id="lineupWrap"></div>
-      </div>
-      <div>
-        <div class="section-head"><h2>Rating Trend</h2><p>Average rating by year</p></div>
-        <div class="panel trend-panel"><div class="trend-grid" id="trendGrid"></div></div>
+  <section class="ledger">
+    <div class="ledger-head">
+      <h2 style="font-family:var(--font-display); font-size:21px; margin:0; font-weight:700;">Full Ledger</h2>
+      <div class="ledger-head-right">
+        <span id="countLabel"></span>
+        <button class="chip" id="exportBtn" type="button" hidden>⬇ Export CSV</button>
+        <button class="chip" id="printBtn" type="button">🖨 Print report</button>
       </div>
     </div>
-  </section>
-
-  <section class="compare" aria-label="Current vs. prior period">
-    <div class="section-head">
-      <h2>Then vs. Now</h2>
-      <p>Current 18-month window vs. the 18 months before it</p>
+    <div class="panel">
+      <div class="ledger-list" id="ledgerList"></div>
+      <div class="empty-state" id="emptyState" hidden>No reviews match these filters.</div>
     </div>
-    <div class="panel compare-panel" style="overflow-x:auto;">
-      <table class="compare-table" id="compareTable"></table>
-    </div>
-  </section>
-
-  <section aria-label="Go to full ledger">
-    <a class="nav-cta" href="ledger.html">
-      <span class="nav-cta-text">
-        <b>Browse the Full Ledger</b>
-        <span>Search, filter by kitchen or skill, and read every review</span>
-      </span>
-      <span class="nav-cta-arrow">→</span>
-    </a>
+    <div class="load-more-wrap"><button id="loadMore">Show 40 more</button></div>
   </section>
 
   <footer>
@@ -463,198 +423,174 @@ function tokenizeReview(text){
 
 </script>
 <script>
-// ---- masthead stats ----
-document.getElementById("statTotal").textContent = DATA.length;
-document.getElementById("statAvg").textContent = (DATA.reduce((a,r)=>a+r.stars,0)/DATA.length).toFixed(2) + "★";
-const allDates = DATA.map(r=>r.date).sort();
-document.getElementById("statSpan").textContent = allDates.length ? (fmtMonthYear(allDates[0]) + "–" + fmtMonthYear(allDates[allDates.length-1])) : "–";
-document.getElementById("statPos").textContent = Object.values(globalSkill).reduce((a,s)=>a+s.pos,0);
-document.getElementById("statNeg").textContent = Object.values(globalSkill).reduce((a,s)=>a+s.neg,0);
 document.getElementById("genDate").textContent = "Compiled " + new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
 
-// ---- word clusters render ----
+// ---- cards ----
 (function(){
-  const posReviews = DATA.filter(r=>r.stars>=4), negReviews = DATA.filter(r=>r.stars<=2);
-  const posCounts={}, negCounts={};
-  posReviews.forEach(r=>tokenizeReview(r.review).forEach(w=>posCounts[w]=(posCounts[w]||0)+1));
-  negReviews.forEach(r=>tokenizeReview(r.review).forEach(w=>negCounts[w]=(negCounts[w]||0)+1));
-  const posTotal = Object.values(posCounts).reduce((a,b)=>a+b,0) || 1;
-  const negTotal = Object.values(negCounts).reduce((a,b)=>a+b,0) || 1;
-  const allWords = new Set([...Object.keys(posCounts), ...Object.keys(negCounts)]);
-  const scored = [...allWords].map(w=>{
-    const pc = posCounts[w]||0, nc = negCounts[w]||0;
-    return {w, pc, nc, total: pc+nc, diff: (pc/posTotal) - (nc/negTotal)};
-  }).filter(x=>x.total>=3);
-
-  const topPos = scored.filter(x=>x.diff>0).sort((a,b)=>b.diff-a.diff).slice(0,24);
-  const topNeg = scored.filter(x=>x.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,24);
-
-  function renderCloud(elId, words, cls){
-    const el = document.getElementById(elId);
-    if(!words.length){ el.innerHTML = `<span class="wc-empty">Not enough review text yet to find a pattern here.</span>`; return; }
-    const maxCount = Math.max(...words.map(x=>x.total));
-    const minSize = 13, maxSize = 34;
-    el.innerHTML = words.map(x=>{
-      const size = minSize + Math.sqrt(x.total/maxCount) * (maxSize-minSize);
-      const count = cls==="pos" ? x.pc : x.nc;
-      return `<span class="wc-word ${cls}" style="font-size:${size.toFixed(1)}px" title="${x.w} — used in ${count} review${count===1?'':'s'}">${x.w}</span>`;
-    }).join("");
-  }
-  renderCloud("posCloud", topPos, "pos");
-  renderCloud("negCloud", topNeg, "neg");
-})();
-
-// ---- coaching signal diverging chart ----
-(function(){
-  const el = document.getElementById("signalChart");
-  const ranked = SKILL_NAMES.slice().sort((a,b)=>(globalSkill[b].pos+globalSkill[b].neg)-(globalSkill[a].pos+globalSkill[a].neg));
-  const maxSide = Math.max(1, ...ranked.map(s=>Math.max(globalSkill[s].pos, globalSkill[s].neg)));
-  let html = "";
-  ranked.forEach(skill=>{
-    const {pos,neg} = globalSkill[skill];
-    const negPct = (neg/maxSide*50).toFixed(1);
-    const posPct = (pos/maxSide*50).toFixed(1);
-    html += `<div class="div-row">
-      <div class="div-label">${skill}</div>
-      <div class="div-track">
-        <div class="div-mid"></div>
-        <div class="div-bar neg" style="width:${negPct}%"></div>
-        <div class="div-bar pos" style="width:${posPct}%"></div>
-        ${neg>0 ? `<div class="div-count" style="right:calc(50% + ${negPct}% + 6px); color:var(--critical)">${neg}</div>` : ""}
-        ${pos>0 ? `<div class="div-count" style="left:calc(50% + ${posPct}% + 6px); color:var(--good)">${pos}</div>` : ""}
-      </div>
-    </div>`;
-  });
-  html += `<div class="div-legend">
-    <span><span class="dot" style="background:var(--critical)"></span>Coaching flag (1–2★ mention)</span>
-    <span><span class="dot" style="background:var(--good)"></span>Compliment (4–5★ mention)</span>
-  </div>`;
-  el.innerHTML = html;
-})();
-
-// ---- above & beyond / needs coaching highlight cards ----
-function bestExample(skill, sentiment){
-  const pool = DATA.filter(r=>r._skills.includes(skill) && r._sent===sentiment);
-  if(!pool.length) return null;
-  return pool.slice().sort((a,b)=>b.review.length-a.review.length)[0];
-}
-(function(){
-  const posRanked = SKILL_NAMES.filter(s=>globalSkill[s].pos>0).sort((a,b)=>globalSkill[b].pos-globalSkill[a].pos).slice(0,4);
-  const negRanked = SKILL_NAMES.filter(s=>globalSkill[s].neg>0).sort((a,b)=>globalSkill[b].neg-globalSkill[a].neg).slice(0,4);
-
-  const posEl = document.getElementById("aboveBeyond");
-  posEl.innerHTML = `<h3>\u{1F3C6} Above &amp; Beyond</h3>` + posRanked.map(skill=>{
-    const ex = bestExample(skill,"pos");
-    return `<div class="highlight-item">
-      <div class="highlight-top">
-        <span class="highlight-skill" style="background:var(--good)">${skill}</span>
-        <span class="highlight-biz">${ex ? ex.business : ""}</span>
-      </div>
-      <div class="highlight-quote">${ex ? '"' + escapeHtml(ex.review.slice(0,150)) + (ex.review.length>150?'…':'') + '"' : ""} <b>— ${ex ? escapeHtml(ex.reviewer) : ""}</b></div>
-    </div>`;
-  }).join("");
-
-  const negEl = document.getElementById("needsCoaching");
-  negEl.innerHTML = `<h3>⚠️ Needs Coaching</h3>` + negRanked.map(skill=>{
-    const ex = bestExample(skill,"neg");
-    return `<div class="highlight-item">
-      <div class="highlight-top">
-        <span class="highlight-skill" style="background:var(--critical); color:#fff;">${skill}</span>
-        <span class="highlight-biz">${ex ? ex.business : ""}</span>
-      </div>
-      <div class="highlight-quote">${ex ? '"' + escapeHtml(ex.review.slice(0,150)) + (ex.review.length>150?'…':'') + '"' : ""} <b>— ${ex ? escapeHtml(ex.reviewer) : ""}</b></div>
-    </div>`;
-  }).join("");
-})();
-
-// ---- lineup chart ----
-(function(){
-  const wrap = document.getElementById("lineupWrap");
-  const ranked = BIZ_ORDER.slice().sort((a,b)=>agg[b].avg-agg[a].avg);
-  let html = "";
-  ranked.forEach(biz=>{
-    const a = agg[biz];
-    const pct = (a.avg/5*100).toFixed(1);
-    html += `<div class="lineup-row">
-      <div class="lineup-name"><span class="dot" style="background:${BIZ_COLOR[biz]}"></span>${biz}</div>
-      <div class="lineup-track"><div class="lineup-bar" style="width:${pct}%; background:${BIZ_COLOR[biz]}"></div></div>
-      <div class="lineup-value"><b>${a.avg.toFixed(2)}★</b></div>
-    </div>`;
-  });
-  wrap.innerHTML = html;
-})();
-
-// ---- rating trend small multiples ----
-(function(){
-  const grid = document.getElementById("trendGrid");
+  const grid = document.getElementById("cardGrid");
   let html = "";
   BIZ_ORDER.forEach(biz=>{
-    const rows = agg[biz].rows;
-    const byYear = {};
-    rows.forEach(r=>{ const y=r.date.slice(0,4); (byYear[y] ||= []).push(r.stars); });
-    const years = Object.keys(byYear).sort();
-    const pts = years.map(y=>byYear[y].reduce((a,b)=>a+b,0)/byYear[y].length);
-    const W=140,H=40,pad=4;
-    const minV=1,maxV=5;
-    const xs = pts.map((_,i)=> pad + i*(W-2*pad)/Math.max(1,pts.length-1));
-    const ys = pts.map(v=> H-pad - (v-minV)/(maxV-minV)*(H-2*pad));
-    const line = xs.map((x,i)=>`${i===0?'M':'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
-    const area = `M${xs[0].toFixed(1)},${H} ` + xs.map((x,i)=>`L${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ') + ` L${xs[xs.length-1].toFixed(1)},${H} Z`;
-    const lastX = xs[xs.length-1], lastY = ys[ys.length-1];
-    html += `<div class="trend-cell">
-      <div class="trend-head">
-        <span class="trend-name"><span class="dot" style="background:${BIZ_COLOR[biz]}"></span>${biz}</span>
-        <span class="trend-avg">${agg[biz].avg.toFixed(1)}★</span>
+    const a = agg[biz];
+    const good = a.dist[4]+a.dist[5], mixed = a.dist[3], bad = a.dist[1]+a.dist[2];
+    const total = a.count;
+    const bestSkill = SKILL_NAMES.filter(s=>a.skillCounts[s].pos>0).sort((x,y)=>a.skillCounts[y].pos-a.skillCounts[x].pos)[0];
+    const workSkill = SKILL_NAMES.filter(s=>a.skillCounts[s].neg>0).sort((x,y)=>a.skillCounts[y].neg-a.skillCounts[x].neg)[0];
+    html += `<button class="card" style="--cat:${BIZ_COLOR[biz]}" data-biz="${biz}" aria-pressed="false">
+      <div class="card-top">
+        <div><div class="card-name">${biz}</div><div class="card-cuisine">${BIZ_CUISINE[biz]}</div></div>
+        <div class="card-rating"><b>${a.avg.toFixed(1)}</b><span>/ 5</span></div>
       </div>
-      <svg class="trend-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-        <path d="${area}" fill="${BIZ_COLOR[biz]}" opacity="0.12" stroke="none"/>
-        <path d="${line}" fill="none" stroke="${BIZ_COLOR[biz]}" stroke-width="1.75" vector-effect="non-scaling-stroke"/>
-        <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.5" fill="${BIZ_COLOR[biz]}"/>
-      </svg>
-    </div>`;
+      <div class="card-dist" title="${good} positive (4–5★) · ${mixed} mixed (3★) · ${bad} negative (1–2★)">
+        <i style="width:${good/total*100}%;background:var(--good)"></i><i style="width:${mixed/total*100}%;background:var(--warning)"></i><i style="width:${bad/total*100}%;background:var(--critical)"></i>
+      </div>
+      <div class="card-tags">
+        ${bestSkill ? `<div class="card-tag"><span class="tagdot" style="background:var(--good)"></span>Best at: <b>${bestSkill}</b></div>` : ""}
+        ${workSkill ? `<div class="card-tag"><span class="tagdot" style="background:var(--critical)"></span>Work on: <b>${workSkill}</b></div>` : ""}
+      </div>
+      <div class="card-meta"><span><b>${total}</b> reviews</span><span>${a.first.slice(0,4)}–${a.last.slice(0,4)}</span></div>
+    </button>`;
   });
   grid.innerHTML = html;
 })();
 
-// ---- then vs. now comparison table ----
+// ---- filter chips ----
 (function(){
-  const table = document.getElementById("compareTable");
-  function stats(rows){
-    if(!rows.length) return {count:0, avg:0, neg:0, pos:0};
-    const avg = rows.reduce((a,r)=>a+r.stars,0)/rows.length;
-    let neg=0,pos=0;
-    rows.forEach(r=>{
-      const sk = matchSkills(r.review);
-      const sent = r.stars>=4?"pos":r.stars<=2?"neg":"neu";
-      if(sent==="pos") pos+=sk.length; else if(sent==="neg") neg+=sk.length;
-    });
-    return {count: rows.length, avg, neg, pos};
-  }
-  function avgDelta(curr, prior){
-    if(!prior) return `<span class="compare-delta flat">–</span>`;
-    const diff = curr - prior;
-    if(Math.abs(diff) < 0.05) return `<span class="compare-delta flat">±0.0</span>`;
-    const cls = diff>0 ? "up" : "down";
-    return `<span class="compare-delta ${cls}">${diff>0?"▲":"▼"} ${Math.abs(diff).toFixed(1)}</span>`;
-  }
-  function countDelta(curr, prior, goodDirection){
-    if(prior===0 && curr===0) return `<span class="compare-delta flat">–</span>`;
-    const diff = curr - prior;
-    if(diff===0) return `<span class="compare-delta flat">±0</span>`;
-    const isGood = goodDirection==="up" ? diff>0 : diff<0;
-    return `<span class="compare-delta ${isGood?"up":"down"}">${diff>0?"▲":"▼"} ${Math.abs(diff)}</span>`;
-  }
-  function row(label, curr, prior, isTotal){
-    return `<tr${isTotal?' class="total-row"':''}>
-      <td>${label}</td>
-      <td>${curr.count} <span style="color:var(--ink-mute); font-family:var(--font-mono); font-size:11px;">(was ${prior.count})</span></td>
-      <td>${curr.avg.toFixed(2)}★ ${avgDelta(curr.avg, prior.avg)}</td>
-      <td>${curr.pos} ${countDelta(curr.pos, prior.pos, "up")}</td>
-      <td>${curr.neg} ${countDelta(curr.neg, prior.neg, "down")}</td>
-    </tr>`;
-  }
-  let rowsHtml = BIZ_ORDER.map(biz => row(biz, stats(DATA.filter(r=>r.business===biz)), stats(PRIOR_DATA.filter(r=>r.business===biz)))).join("");
-  rowsHtml += row("All kitchens", stats(DATA), stats(PRIOR_DATA), true);
-  table.innerHTML = `<thead><tr><th>Kitchen</th><th>Reviews</th><th>Avg rating</th><th>Compliments</th><th>Coaching flags</th></tr></thead><tbody>${rowsHtml}</tbody>`;
+  const wrap = document.getElementById("starChips");
+  let html = `<button class="chip" data-star="all" aria-pressed="true">All stars</button>`;
+  for(let s=5;s>=1;s--) html += `<button class="chip" data-star="${s}" aria-pressed="false"><span class="swatch" style="background:${STAR_COLOR[s]}"></span>${s}★</button>`;
+  wrap.innerHTML = html;
+
+  const skillWrap = document.getElementById("skillChips");
+  skillWrap.innerHTML = SKILL_NAMES.filter(s=>globalSkill[s].pos+globalSkill[s].neg>0).map(s=>
+    `<button class="chip" data-skill="${s}" aria-pressed="false">${s}</button>`
+  ).join("");
 })();
+
+// ---- state ----
+const state = { biz:new Set(), star:"all", skill:null, q:"", sort:"newest", visible:40 };
+
+function applyFilters(){
+  let rows = DATA;
+  if(state.biz.size) rows = rows.filter(r=>state.biz.has(r.business));
+  if(state.star!=="all") rows = rows.filter(r=>r.stars===Number(state.star));
+  if(state.skill) rows = rows.filter(r=>r._skills.includes(state.skill));
+  if(state.q) rows = rows.filter(r=>r.review.toLowerCase().includes(state.q));
+  rows = rows.slice().sort((a,b)=>{
+    if(state.sort==="newest") return b.date.localeCompare(a.date);
+    if(state.sort==="oldest") return a.date.localeCompare(b.date);
+    if(state.sort==="highest") return b.stars-a.stars || b.date.localeCompare(a.date);
+    if(state.sort==="lowest") return a.stars-b.stars || b.date.localeCompare(a.date);
+  });
+  return rows;
+}
+
+function renderLedger(){
+  const rows = applyFilters();
+  const list = document.getElementById("ledgerList");
+  const empty = document.getElementById("emptyState");
+  const loadBtn = document.getElementById("loadMore");
+  const shown = rows.slice(0, state.visible);
+  document.getElementById("countLabel").textContent = `Showing ${shown.length} of ${rows.length}`;
+
+  if(rows.length===0){ list.innerHTML=""; empty.hidden=false; loadBtn.hidden=true; return; }
+  empty.hidden = true;
+
+  list.innerHTML = shown.map((r,i)=>{
+    const skillPills = r._skills.map(s=>{
+      const cls = r._sent==="pos" ? "pos" : r._sent==="neg" ? "neg" : "pos";
+      return r._sent==="neu" ? "" : `<span class="skill-pill ${cls}" data-skill="${s}">${s}</span>`;
+    }).join("");
+    return `<div class="entry">
+      <div class="entry-date">${fmtDate(r.date)}</div>
+      <div class="entry-biz">
+        <span class="biz-tag" style="background:${BIZ_COLOR[r.business]}">${r.business}</span>
+        <span class="reviewer">${escapeHtml(r.reviewer)}</span>
+      </div>
+      <div class="entry-rating"><span class="star-badge" style="background:${STAR_COLOR[r.stars]}">${r.stars}★</span></div>
+      <div class="entry-body">
+        <p class="clamp" id="rev-${i}">${escapeHtml(r.review)}</p>
+        <button class="more-btn" data-target="rev-${i}">Read more</button>
+        ${skillPills ? `<div class="entry-skills">${skillPills}</div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  loadBtn.hidden = state.visible >= rows.length;
+
+  list.querySelectorAll(".more-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const p = document.getElementById(btn.dataset.target);
+      const collapsed = p.classList.toggle("clamp");
+      btn.textContent = collapsed ? "Read more" : "Show less";
+    });
+  });
+  list.querySelectorAll(".skill-pill").forEach(pill=>{
+    pill.addEventListener("click", ()=>{
+      selectSkill(pill.dataset.skill);
+    });
+  });
+}
+
+function selectSkill(skill){
+  state.skill = state.skill===skill ? null : skill;
+  state.visible = 40;
+  document.querySelectorAll("#skillChips .chip").forEach(c=>c.setAttribute("aria-pressed", c.dataset.skill===state.skill ? "true":"false"));
+  renderLedger();
+}
+
+document.getElementById("loadMore").addEventListener("click", ()=>{ state.visible += 40; renderLedger(); });
+document.getElementById("search").addEventListener("input", (e)=>{ state.q = e.target.value.trim().toLowerCase(); state.visible = 40; renderLedger(); });
+document.getElementById("sortSelect").addEventListener("change", (e)=>{ state.sort = e.target.value; state.visible = 40; renderLedger(); });
+
+document.getElementById("starChips").addEventListener("click", (e)=>{
+  const btn = e.target.closest(".chip"); if(!btn) return;
+  state.star = btn.dataset.star; state.visible = 40;
+  [...btn.parentElement.children].forEach(c=>c.setAttribute("aria-pressed", c===btn ? "true":"false"));
+  renderLedger();
+});
+document.getElementById("skillChips").addEventListener("click", (e)=>{
+  const btn = e.target.closest(".chip"); if(!btn) return;
+  selectSkill(btn.dataset.skill);
+});
+document.getElementById("cardGrid").addEventListener("click", (e)=>{
+  const card = e.target.closest(".card"); if(!card) return;
+  const biz = card.dataset.biz;
+  if(state.biz.has(biz)){ state.biz.delete(biz); card.setAttribute("aria-pressed","false"); }
+  else { state.biz.add(biz); card.setAttribute("aria-pressed","true"); }
+  state.visible = 40;
+  renderLedger();
+});
+
+renderLedger();
+
+// ---- export & print ----
+if (window.claude) {
+  window.claude.use("downloads").then(api => {
+    if (!api) return;
+    const btn = document.getElementById("exportBtn");
+    btn.hidden = false;
+    btn.addEventListener("click", async () => {
+      const rows = applyFilters();
+      const esc = s => '"' + String(s).replace(/"/g, '""') + '"';
+      const header = "business,reviewer,stars,date,review";
+      const csv = [header, ...rows.map(r => [r.business, r.reviewer, r.stars, r.date, r.review].map(esc).join(","))].join("\r\n");
+      try { await api.save({ filename: "food-court-reviews.csv", data: csv }); }
+      catch (e) { /* viewer declined, or saves unavailable here — no-op */ }
+    });
+  });
+}
+
+document.getElementById("printBtn").addEventListener("click", () => {
+  state._prevVisible = state.visible;
+  state.visible = Infinity;
+  renderLedger();
+  window.print();
+});
+window.addEventListener("afterprint", () => {
+  if (state._prevVisible !== undefined) {
+    state.visible = state._prevVisible;
+    delete state._prevVisible;
+    renderLedger();
+  }
+});
 </script>
