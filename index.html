@@ -281,6 +281,28 @@
   .top-ledger-link:hover{text-decoration:underline;}
   .top-ledger-link:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 
+  /* ---------- where to focus ---------- */
+  .focus-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:12px;}
+  .focus-card{
+    padding:18px 20px 20px; display:flex; flex-direction:column; gap:14px;
+    position:relative; overflow:hidden;
+  }
+  .focus-card::before{content:""; position:absolute; top:0; left:0; right:0; height:3px; background:var(--cat);}
+  .focus-kitchen{font-family:var(--font-display); font-weight:700; font-size:15px; display:flex; align-items:center; gap:7px; color:var(--ink);}
+  .focus-row{display:flex; flex-direction:column; gap:5px;}
+  .focus-row + .focus-row{padding-top:12px; border-top:1px solid var(--line);}
+  .focus-label{
+    font-family:var(--font-mono); font-size:10px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.06em; display:flex; align-items:center; gap:6px;
+  }
+  .focus-label.coach{color:var(--critical);}
+  .focus-label.recognize{color:var(--good);}
+  .focus-skill{font-size:13px; font-weight:600; color:var(--ink);}
+  .focus-skill span{font-family:var(--font-mono); font-weight:500; font-size:11px; color:var(--ink-mute);}
+  .focus-quote{font-size:12px; line-height:1.5; color:var(--ink-soft); font-style:italic; margin:0;}
+  .focus-quote b{font-style:normal; color:var(--ink-mute); font-size:11px;}
+  .focus-none{font-size:12px; color:var(--ink-mute); font-style:italic;}
+
   @media print{ .nav-cta{display:none !important;} .top-ledger-link{display:none !important;} }
 </style>
 
@@ -355,6 +377,14 @@
     <div class="panel compare-panel" style="overflow-x:auto;">
       <table class="compare-table" id="compareTable"></table>
     </div>
+  </section>
+
+  <section class="focus" aria-label="Coaching and recognition priorities">
+    <div class="section-head">
+      <h2>Where to Focus</h2>
+      <p>One coaching priority and one recognition per kitchen this window, by Soft Skills category</p>
+    </div>
+    <div class="focus-grid" id="focusGrid"></div>
   </section>
 
   <section aria-label="Go to full ledger">
@@ -667,5 +697,50 @@ function bestExample(skill, sentiment){
   let rowsHtml = BIZ_ORDER.map(biz => row(biz, stats(DATA.filter(r=>r.business===biz)), stats(PRIOR_DATA.filter(r=>r.business===biz)))).join("");
   rowsHtml += row("All kitchens", stats(DATA), stats(PRIOR_DATA), true);
   table.innerHTML = `<thead><tr><th>Kitchen</th><th>Reviews</th><th>Avg rating</th><th>Compliments</th><th>Coaching flags</th></tr></thead><tbody>${rowsHtml}</tbody>`;
+})();
+
+// ---- where to focus: per-kitchen coaching + recognition priority ----
+function bestExampleForBiz(biz, skill, sentiment){
+  const pool = DATA.filter(r=>r.business===biz && r._skills.includes(skill) && r._sent===sentiment);
+  if(!pool.length) return null;
+  return pool.slice().sort((a,b)=>b.review.length-a.review.length)[0];
+}
+(function(){
+  const grid = document.getElementById("focusGrid");
+  grid.innerHTML = BIZ_ORDER.map(biz=>{
+    const counts = agg[biz].skillCounts;
+    const coachSkill = SKILL_NAMES.filter(s=>counts[s].neg>0).sort((a,b)=>counts[b].neg-counts[a].neg)[0];
+    const recognizeSkill = SKILL_NAMES.filter(s=>counts[s].pos>0).sort((a,b)=>counts[b].pos-counts[a].pos)[0];
+
+    const coachRow = coachSkill ? (()=>{
+      const ex = bestExampleForBiz(biz, coachSkill, "neg");
+      return `<div class="focus-row">
+        <div class="focus-label coach">🎯 Coach</div>
+        <div class="focus-skill">${coachSkill} <span>· ${counts[coachSkill].neg} mention${counts[coachSkill].neg===1?"":"s"}</span></div>
+        ${ex ? `<p class="focus-quote">"${escapeHtml(ex.review.slice(0,130))}${ex.review.length>130?"…":""}" <b>— ${escapeHtml(ex.reviewer)}</b></p>` : ""}
+      </div>`;
+    })() : `<div class="focus-row">
+        <div class="focus-label coach">🎯 Coach</div>
+        <p class="focus-none">No coaching flags this window — steady performance.</p>
+      </div>`;
+
+    const recognizeRow = recognizeSkill ? (()=>{
+      const ex = bestExampleForBiz(biz, recognizeSkill, "pos");
+      return `<div class="focus-row">
+        <div class="focus-label recognize">⭐ Recognize</div>
+        <div class="focus-skill">${recognizeSkill} <span>· ${counts[recognizeSkill].pos} mention${counts[recognizeSkill].pos===1?"":"s"}</span></div>
+        ${ex ? `<p class="focus-quote">"${escapeHtml(ex.review.slice(0,130))}${ex.review.length>130?"…":""}" <b>— ${escapeHtml(ex.reviewer)}</b></p>` : ""}
+      </div>`;
+    })() : `<div class="focus-row">
+        <div class="focus-label recognize">⭐ Recognize</div>
+        <p class="focus-none">No standout compliments yet this window.</p>
+      </div>`;
+
+    return `<div class="panel focus-card" style="--cat:${BIZ_COLOR[biz]}">
+      <div class="focus-kitchen"><span class="dot" style="background:${BIZ_COLOR[biz]}"></span>${biz}</div>
+      ${coachRow}
+      ${recognizeRow}
+    </div>`;
+  }).join("");
 })();
 </script>
