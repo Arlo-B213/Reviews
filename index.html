@@ -66,8 +66,20 @@
 
   .kpi-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:14px; overflow:hidden; margin-top:6px;}
   .kpi{background:var(--surface); padding:16px 18px; display:flex; flex-direction:column; gap:4px;}
+  .kpi-value-row{display:flex; align-items:baseline; gap:7px;}
   .kpi b{font-family:var(--font-mono); font-size:26px; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-0.01em;}
-  .kpi span{font-size:11.5px; color:var(--ink-mute); text-transform:uppercase; letter-spacing:.05em;}
+  .kpi > span{font-size:11.5px; color:var(--ink-mute); text-transform:uppercase; letter-spacing:.05em;}
+  .kpi-delta{font-family:var(--font-mono); font-size:11px; font-weight:600; padding:2px 6px; border-radius:5px; display:inline-block;}
+  .kpi-delta.up{color:var(--good); background:color-mix(in srgb, var(--good) 14%, transparent);}
+  .kpi-delta.down{color:var(--critical); background:color-mix(in srgb, var(--critical) 14%, transparent);}
+  .kpi-delta.flat{color:var(--ink-mute); background:var(--surface-2);}
+
+  .exec-summary{
+    background:var(--surface); border:1px solid var(--line); border-left:4px solid var(--accent);
+    border-radius:10px; padding:14px 18px; font-size:15px; line-height:1.55; color:var(--ink);
+    margin:0; max-width:72ch;
+  }
+  .exec-summary b{font-weight:700;}
 
   section{margin-bottom:40px;}
   .section-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap;}
@@ -128,7 +140,7 @@
   .wordcloud-panel{padding:26px 28px 28px;}
   .pos-panel{background:color-mix(in srgb, var(--good) 5%, var(--surface));}
   .neg-panel{background:color-mix(in srgb, var(--critical) 5%, var(--surface));}
-  .wordcloud-panel h3{font-family:var(--font-display); font-size:16px; font-weight:700; margin:0 0 4px;}
+  .wordcloud-panel h3{font-family:var(--font-display); font-size:16px; font-weight:700; margin:0 0 4px; display:flex; align-items:center; gap:8px;}
   .wc-sub{font-size:12px; color:var(--ink-mute); margin:0 0 20px;}
   .wc-flow{display:flex; flex-wrap:wrap; align-items:baseline; gap:7px 16px; min-height:40px;}
   .wc-word{font-family:var(--font-display); font-weight:700; cursor:default; white-space:nowrap; line-height:1.15;}
@@ -319,12 +331,13 @@
     </div>
     <h1>Food Court, <em>Tallied</em></h1>
     <p class="dek">Yelp reviews from the past 18 months across the food court's six kitchens, scored, charted, and mapped onto the same coaching categories used on the floor — so a Yelp complaint and a coaching note can point at the same thing.</p>
+    <p class="exec-summary" id="execSummary"></p>
     <div class="kpi-row">
-      <div class="kpi"><b id="statTotal">–</b><span>Reviews tallied</span></div>
-      <div class="kpi"><b id="statAvg">–</b><span>Ledger average</span></div>
-      <div class="kpi"><b id="statSpan">–</b><span>Window covered</span></div>
-      <div class="kpi"><b id="statPos">–</b><span>Compliment signals</span></div>
-      <div class="kpi"><b id="statNeg">–</b><span>Coaching signals</span></div>
+      <div class="kpi"><div class="kpi-value-row"><b id="statTotal">–</b><span class="kpi-delta" id="statTotalDelta"></span></div><span>Reviews tallied</span></div>
+      <div class="kpi"><div class="kpi-value-row"><b id="statAvg">–</b><span class="kpi-delta" id="statAvgDelta"></span></div><span>Ledger average</span></div>
+      <div class="kpi"><div class="kpi-value-row"><b id="statSpan">–</b></div><span>Window covered</span></div>
+      <div class="kpi"><div class="kpi-value-row"><b id="statPos">–</b><span class="kpi-delta" id="statPosDelta"></span></div><span>Compliment signals</span></div>
+      <div class="kpi"><div class="kpi-value-row"><b id="statNeg">–</b><span class="kpi-delta" id="statNegDelta"></span></div><span>Coaching signals</span></div>
     </div>
   </header>
 
@@ -335,12 +348,12 @@
     </div>
     <div class="wordcloud-grid">
       <div class="panel wordcloud-panel pos-panel">
-        <h3>😊 What's Working</h3>
+        <h3><span class="dot" style="background:var(--good)"></span> What's Working</h3>
         <p class="wc-sub">Words that show up far more often in glowing reviews</p>
         <div class="wc-flow" id="posCloud"></div>
       </div>
       <div class="panel wordcloud-panel neg-panel">
-        <h3>😠 What's Not</h3>
+        <h3><span class="dot" style="background:var(--critical)"></span> What's Not</h3>
         <p class="wc-sub">Words that show up far more often in low-star complaints</p>
         <div class="wc-flow" id="negCloud"></div>
       </div>
@@ -523,14 +536,70 @@ function tokenizeReview(text){
 
 </script>
 <script>
+// ---- shared then-vs-now helpers (used by the masthead deltas, exec summary, and the comparison table) ----
+function periodStats(rows){
+  if(!rows.length) return {count:0, avg:0, neg:0, pos:0};
+  const avg = rows.reduce((a,r)=>a+r.stars,0)/rows.length;
+  let neg=0,pos=0;
+  rows.forEach(r=>{
+    const sk = matchSkills(r.review);
+    const sent = r.stars>=4?"pos":r.stars<=2?"neg":"neu";
+    if(sent==="pos") pos+=sk.length; else if(sent==="neg") neg+=sk.length;
+  });
+  return {count: rows.length, avg, neg, pos};
+}
+function avgDeltaInfo(curr, prior){
+  if(prior===null || prior===undefined) return {cls:"flat", text:"–"};
+  const diff = curr - prior;
+  if(Math.abs(diff) < 0.05) return {cls:"flat", text:"±0.0"};
+  return {cls: diff>0?"up":"down", text: (diff>0?"▲":"▼") + " " + Math.abs(diff).toFixed(1)};
+}
+function countDeltaInfo(curr, prior, goodDirection){
+  if(prior===0 && curr===0) return {cls:"flat", text:"–"};
+  const diff = curr - prior;
+  if(diff===0) return {cls:"flat", text:"±0"};
+  const isGood = goodDirection==="up" ? diff>0 : diff<0;
+  return {cls:isGood?"up":"down", text:(diff>0?"▲":"▼") + " " + Math.abs(diff)};
+}
+function avgDeltaHtml(curr, prior){ const d=avgDeltaInfo(curr,prior); return `<span class="compare-delta ${d.cls}">${d.text}</span>`; }
+function countDeltaHtml(curr, prior, dir){ const d=countDeltaInfo(curr,prior,dir); return `<span class="compare-delta ${d.cls}">${d.text}</span>`; }
+function applyDelta(el, info){ if(!el) return; el.textContent = info.text; el.className = "kpi-delta " + info.cls; }
+
 // ---- masthead stats ----
-document.getElementById("statTotal").textContent = DATA.length;
-document.getElementById("statAvg").textContent = (DATA.reduce((a,r)=>a+r.stars,0)/DATA.length).toFixed(2) + "★";
+const currAll = periodStats(DATA);
+const priorAll = periodStats(PRIOR_DATA);
+const priorAvgOrNull = priorAll.count ? priorAll.avg : null;
+
+document.getElementById("statTotal").textContent = currAll.count;
+document.getElementById("statAvg").textContent = currAll.avg.toFixed(2) + "★";
 const allDates = DATA.map(r=>r.date).sort();
 document.getElementById("statSpan").textContent = allDates.length ? (fmtMonthYear(allDates[0]) + "–" + fmtMonthYear(allDates[allDates.length-1])) : "–";
-document.getElementById("statPos").textContent = Object.values(globalSkill).reduce((a,s)=>a+s.pos,0);
-document.getElementById("statNeg").textContent = Object.values(globalSkill).reduce((a,s)=>a+s.neg,0);
+document.getElementById("statPos").textContent = currAll.pos;
+document.getElementById("statNeg").textContent = currAll.neg;
 document.getElementById("genDate").textContent = "Compiled " + new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});
+
+applyDelta(document.getElementById("statTotalDelta"), countDeltaInfo(currAll.count, priorAll.count, "up"));
+applyDelta(document.getElementById("statAvgDelta"), avgDeltaInfo(currAll.avg, priorAvgOrNull));
+applyDelta(document.getElementById("statPosDelta"), countDeltaInfo(currAll.pos, priorAll.pos, "up"));
+applyDelta(document.getElementById("statNegDelta"), countDeltaInfo(currAll.neg, priorAll.neg, "down"));
+
+// ---- executive summary ----
+(function(){
+  const rankedBiz = BIZ_ORDER.filter(b=>agg[b].count>0).sort((a,b)=>agg[b].avg-agg[a].avg);
+  const el = document.getElementById("execSummary");
+  if(!rankedBiz.length){ el.hidden = true; return; }
+  const best = rankedBiz[0], worst = rankedBiz[rankedBiz.length-1];
+  let trendPhrase = "";
+  if(priorAvgOrNull !== null){
+    const avgDiff = currAll.avg - priorAvgOrNull;
+    trendPhrase = Math.abs(avgDiff) < 0.05
+      ? ", holding steady versus the prior 18 months"
+      : (avgDiff > 0 ? `, up ${avgDiff.toFixed(1)} versus the prior 18 months` : `, down ${Math.abs(avgDiff).toFixed(1)} versus the prior 18 months`);
+  }
+  el.innerHTML = worst !== best
+    ? `This window's ledger average is <b>${currAll.avg.toFixed(2)}★</b>${trendPhrase}. <b>${worst}</b> is the primary coaching focus at ${agg[worst].avg.toFixed(1)}★, while <b>${best}</b> leads at ${agg[best].avg.toFixed(1)}★.`
+    : `This window's ledger average is <b>${currAll.avg.toFixed(2)}★</b>${trendPhrase}.`;
+})();
 
 // ---- word clusters render ----
 (function(){
@@ -603,7 +672,7 @@ function bestExample(skill, sentiment){
   const negRanked = SKILL_NAMES.filter(s=>globalSkill[s].neg>0).sort((a,b)=>globalSkill[b].neg-globalSkill[a].neg).slice(0,4);
 
   const posEl = document.getElementById("aboveBeyond");
-  posEl.innerHTML = `<h3>\u{1F3C6} Above &amp; Beyond</h3>` + posRanked.map(skill=>{
+  posEl.innerHTML = `<h3><span class="dot" style="background:var(--good)"></span> Above &amp; Beyond</h3>` + posRanked.map(skill=>{
     const ex = bestExample(skill,"pos");
     return `<div class="highlight-item">
       <div class="highlight-top">
@@ -615,7 +684,7 @@ function bestExample(skill, sentiment){
   }).join("");
 
   const negEl = document.getElementById("needsCoaching");
-  negEl.innerHTML = `<h3>⚠️ Needs Coaching</h3>` + negRanked.map(skill=>{
+  negEl.innerHTML = `<h3><span class="dot" style="background:var(--critical)"></span> Needs Coaching</h3>` + negRanked.map(skill=>{
     const ex = bestExample(skill,"neg");
     return `<div class="highlight-item">
       <div class="highlight-top">
@@ -679,42 +748,17 @@ function bestExample(skill, sentiment){
 // ---- then vs. now comparison table ----
 (function(){
   const table = document.getElementById("compareTable");
-  function stats(rows){
-    if(!rows.length) return {count:0, avg:0, neg:0, pos:0};
-    const avg = rows.reduce((a,r)=>a+r.stars,0)/rows.length;
-    let neg=0,pos=0;
-    rows.forEach(r=>{
-      const sk = matchSkills(r.review);
-      const sent = r.stars>=4?"pos":r.stars<=2?"neg":"neu";
-      if(sent==="pos") pos+=sk.length; else if(sent==="neg") neg+=sk.length;
-    });
-    return {count: rows.length, avg, neg, pos};
-  }
-  function avgDelta(curr, prior){
-    if(!prior) return `<span class="compare-delta flat">–</span>`;
-    const diff = curr - prior;
-    if(Math.abs(diff) < 0.05) return `<span class="compare-delta flat">±0.0</span>`;
-    const cls = diff>0 ? "up" : "down";
-    return `<span class="compare-delta ${cls}">${diff>0?"▲":"▼"} ${Math.abs(diff).toFixed(1)}</span>`;
-  }
-  function countDelta(curr, prior, goodDirection){
-    if(prior===0 && curr===0) return `<span class="compare-delta flat">–</span>`;
-    const diff = curr - prior;
-    if(diff===0) return `<span class="compare-delta flat">±0</span>`;
-    const isGood = goodDirection==="up" ? diff>0 : diff<0;
-    return `<span class="compare-delta ${isGood?"up":"down"}">${diff>0?"▲":"▼"} ${Math.abs(diff)}</span>`;
-  }
   function row(label, curr, prior, isTotal){
     return `<tr${isTotal?' class="total-row"':''}>
       <td>${label}</td>
       <td>${curr.count} <span style="color:var(--ink-mute); font-family:var(--font-mono); font-size:11px;">(was ${prior.count})</span></td>
-      <td>${curr.avg.toFixed(2)}★ ${avgDelta(curr.avg, prior.avg)}</td>
-      <td>${curr.pos} ${countDelta(curr.pos, prior.pos, "up")}</td>
-      <td>${curr.neg} ${countDelta(curr.neg, prior.neg, "down")}</td>
+      <td>${curr.avg.toFixed(2)}★ ${avgDeltaHtml(curr.avg, prior.count ? prior.avg : null)}</td>
+      <td>${curr.pos} ${countDeltaHtml(curr.pos, prior.pos, "up")}</td>
+      <td>${curr.neg} ${countDeltaHtml(curr.neg, prior.neg, "down")}</td>
     </tr>`;
   }
-  let rowsHtml = BIZ_ORDER.map(biz => row(biz, stats(DATA.filter(r=>r.business===biz)), stats(PRIOR_DATA.filter(r=>r.business===biz)))).join("");
-  rowsHtml += row("All kitchens", stats(DATA), stats(PRIOR_DATA), true);
+  let rowsHtml = BIZ_ORDER.map(biz => row(biz, periodStats(DATA.filter(r=>r.business===biz)), periodStats(PRIOR_DATA.filter(r=>r.business===biz)))).join("");
+  rowsHtml += row("All kitchens", currAll, priorAll, true);
   table.innerHTML = `<thead><tr><th>Kitchen</th><th>Reviews</th><th>Avg rating</th><th>Compliments</th><th>Coaching flags</th></tr></thead><tbody>${rowsHtml}</tbody>`;
 })();
 
@@ -734,24 +778,24 @@ function bestExampleForBiz(biz, skill, sentiment){
     const coachRow = coachSkill ? (()=>{
       const ex = bestExampleForBiz(biz, coachSkill, "neg");
       return `<div class="focus-row">
-        <div class="focus-label coach">🎯 Coach</div>
+        <div class="focus-label coach"><span class="dot" style="background:var(--critical)"></span> Coach</div>
         <div class="focus-skill">${coachSkill} <span>· ${counts[coachSkill].neg} mention${counts[coachSkill].neg===1?"":"s"}</span></div>
         ${ex ? `<p class="focus-quote">"${escapeHtml(ex.review.slice(0,130))}${ex.review.length>130?"…":""}" <b>— ${escapeHtml(ex.reviewer)}</b></p>` : ""}
       </div>`;
     })() : `<div class="focus-row">
-        <div class="focus-label coach">🎯 Coach</div>
+        <div class="focus-label coach"><span class="dot" style="background:var(--critical)"></span> Coach</div>
         <p class="focus-none">No coaching flags this window — steady performance.</p>
       </div>`;
 
     const recognizeRow = recognizeSkill ? (()=>{
       const ex = bestExampleForBiz(biz, recognizeSkill, "pos");
       return `<div class="focus-row">
-        <div class="focus-label recognize">⭐ Recognize</div>
+        <div class="focus-label recognize"><span class="dot" style="background:var(--good)"></span> Recognize</div>
         <div class="focus-skill">${recognizeSkill} <span>· ${counts[recognizeSkill].pos} mention${counts[recognizeSkill].pos===1?"":"s"}</span></div>
         ${ex ? `<p class="focus-quote">"${escapeHtml(ex.review.slice(0,130))}${ex.review.length>130?"…":""}" <b>— ${escapeHtml(ex.reviewer)}</b></p>` : ""}
       </div>`;
     })() : `<div class="focus-row">
-        <div class="focus-label recognize">⭐ Recognize</div>
+        <div class="focus-label recognize"><span class="dot" style="background:var(--good)"></span> Recognize</div>
         <p class="focus-none">No standout compliments yet this window.</p>
       </div>`;
 
