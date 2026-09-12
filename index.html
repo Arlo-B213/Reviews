@@ -217,6 +217,13 @@
   .compare-table tr:last-child td{border-bottom:none;}
   .compare-table tr.total-row td{font-weight:700; border-top:3px double var(--line-strong); border-bottom:none; background:transparent;}
 
+  .source-gap{
+    font-family:var(--font-mono); font-size:10px; font-weight:600; color:var(--warning);
+    background:color-mix(in srgb, var(--warning) 16%, transparent); border-radius:5px; padding:2px 6px; margin-left:6px;
+    display:inline-block; white-space:nowrap;
+  }
+  .source-compare-table td:nth-child(4){color:var(--accent);}
+
   .ledger-head-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
 
   /* ---------- filters ---------- */
@@ -527,6 +534,16 @@
     </div>
   </section>
 
+  <section class="compare-source" aria-label="Yelp vs Google comparison">
+    <div class="section-head">
+      <h2>Yelp vs. Google</h2>
+      <p>All-time rating by platform, plus a combined score that weighs both equally regardless of review volume</p>
+    </div>
+    <div class="panel compare-panel" style="overflow-x:auto;">
+      <table class="compare-table source-compare-table" id="sourceCompareTable"></table>
+    </div>
+  </section>
+
   <section class="focus" aria-label="Coaching and recognition priorities">
     <div class="section-head">
       <h2>Where to Focus</h2>
@@ -633,6 +650,26 @@ function aggregateByBusiness(rowSet){
 // `aggAll` covers every review ever scraped (the Full Ledger page browses this, not the window).
 const agg = aggregateByBusiness(DATA);
 const aggAll = aggregateByBusiness(DATA_ALL);
+
+// ---- Yelp vs Google, per business, all-time (Google reviews skew much older than 18 months,
+// so windowing this the same way the rest of the Overview page is windowed would leave several
+// kitchens looking like they have almost no Google presence — see project notes) ----
+function aggregateBySource(rowSet){
+  const out = {};
+  for(const biz of BIZ_ORDER){
+    const rows = rowSet.filter(r=>r.business===biz);
+    const bySource = {};
+    for(const src of ["Yelp","Google"]){
+      const srows = rows.filter(r=>r.source===src);
+      bySource[src] = { avg: srows.length ? srows.reduce((a,r)=>a+r.stars,0)/srows.length : null, count: srows.length };
+    }
+    const avgs = [bySource.Yelp.avg, bySource.Google.avg].filter(v=>v!==null);
+    const combined = avgs.length ? avgs.reduce((a,b)=>a+b,0)/avgs.length : null;
+    out[biz] = { yelp: bySource.Yelp, google: bySource.Google, combined };
+  }
+  return out;
+}
+const sourceCompare = aggregateBySource(DATA_ALL);
 
 // ---- global skill totals ----
 function globalSkillTotals(rowSet){
@@ -923,6 +960,37 @@ function bestExample(skill, sentiment){
   let rowsHtml = BIZ_ORDER.map(biz => row(biz, periodStats(DATA.filter(r=>r.business===biz)), periodStats(PRIOR_DATA.filter(r=>r.business===biz)))).join("");
   rowsHtml += row("All kitchens", currAll, priorAll, true);
   table.innerHTML = `<thead><tr><th>Kitchen</th><th>Reviews</th><th>Avg rating</th><th>Compliments</th><th>Coaching flags</th></tr></thead><tbody>${rowsHtml}</tbody>`;
+})();
+
+// ---- yelp vs. google comparison table (all-time) ----
+(function(){
+  const table = document.getElementById("sourceCompareTable");
+  function sourceCell(s){
+    if(!s.count) return `<span style="color:var(--ink-mute); font-family:var(--font-mono); font-size:12px;">No reviews yet</span>`;
+    return `${s.avg.toFixed(2)}★ <span style="color:var(--ink-mute); font-family:var(--font-mono); font-size:11px;">(${s.count})</span>`;
+  }
+  function row(label, sc, isTotal){
+    const gap = sc.yelp.avg!==null && sc.google.avg!==null ? Math.abs(sc.yelp.avg - sc.google.avg) : null;
+    const gapHtml = gap!==null && gap>=0.4
+      ? `<span class="source-gap" title="Rates ${gap.toFixed(1)} stars ${sc.yelp.avg>sc.google.avg?'lower':'higher'} on Google than Yelp">${gap.toFixed(1)} gap</span>`
+      : "";
+    return `<tr${isTotal?' class="total-row"':''}>
+      <td>${label}</td>
+      <td>${sourceCell(sc.yelp)}</td>
+      <td>${sourceCell(sc.google)} ${gapHtml}</td>
+      <td><b>${sc.combined!==null ? sc.combined.toFixed(2)+"★" : "—"}</b></td>
+    </tr>`;
+  }
+  const allYelp = DATA_ALL.filter(r=>r.source==="Yelp");
+  const allGoogle = DATA_ALL.filter(r=>r.source==="Google");
+  const overall = {
+    yelp: { avg: allYelp.length ? allYelp.reduce((a,r)=>a+r.stars,0)/allYelp.length : null, count: allYelp.length },
+    google: { avg: allGoogle.length ? allGoogle.reduce((a,r)=>a+r.stars,0)/allGoogle.length : null, count: allGoogle.length },
+  };
+  overall.combined = (overall.yelp.avg + overall.google.avg) / 2;
+  let rowsHtml = BIZ_ORDER.map(biz => row(biz, sourceCompare[biz])).join("");
+  rowsHtml += row("All kitchens", overall, true);
+  table.innerHTML = `<thead><tr><th>Kitchen</th><th>Yelp</th><th>Google</th><th>Combined score</th></tr></thead><tbody>${rowsHtml}</tbody>`;
 })();
 
 // ---- where to focus: per-kitchen coaching + recognition priority ----

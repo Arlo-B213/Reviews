@@ -217,6 +217,13 @@
   .compare-table tr:last-child td{border-bottom:none;}
   .compare-table tr.total-row td{font-weight:700; border-top:3px double var(--line-strong); border-bottom:none; background:transparent;}
 
+  .source-gap{
+    font-family:var(--font-mono); font-size:10px; font-weight:600; color:var(--warning);
+    background:color-mix(in srgb, var(--warning) 16%, transparent); border-radius:5px; padding:2px 6px; margin-left:6px;
+    display:inline-block; white-space:nowrap;
+  }
+  .source-compare-table td:nth-child(4){color:var(--accent);}
+
   .ledger-head-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
 
   /* ---------- filters ---------- */
@@ -353,9 +360,28 @@
   .ledger-masthead h1{font-size:clamp(26px,4vw,38px); animation:fadeUp .55s var(--ease) both .06s;}
   .ledger-masthead .dek{animation:fadeUp .55s var(--ease) both .12s;}
 
-  @media print{ .back-link{display:none !important;} }
+  /* ---------- source tabs: the primary Yelp / Google / All navigation for this page ---------- */
+  .source-tabs{
+    display:flex; gap:4px; margin-top:16px; padding:4px; width:fit-content;
+    background:var(--surface-2); border:1px solid var(--line); border-radius:11px;
+    animation:fadeUp .55s var(--ease) both .16s;
+  }
+  .source-tab{
+    font-family:var(--font-mono); font-size:12.5px; font-weight:600; color:var(--ink-mute);
+    background:none; border:none; border-radius:8px; padding:8px 14px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:7px; transition:background .15s var(--ease), color .15s var(--ease);
+  }
+  .source-tab:hover{color:var(--ink);}
+  .source-tab[aria-selected="true"]{background:var(--surface); color:var(--ink); box-shadow:var(--shadow-sm);}
+  .source-tab-count{
+    font-size:10px; font-weight:700; color:var(--ink-mute); background:var(--surface-hover);
+    border-radius:999px; padding:1px 6px; min-width:18px; text-align:center;
+  }
+  .source-tab[aria-selected="true"] .source-tab-count{background:var(--accent); color:var(--on-accent);}
+
+  @media print{ .back-link{display:none !important;} .source-tabs{display:none !important;} }
   @media (prefers-reduced-motion:reduce){
-    .back-link, .ledger-masthead h1, .ledger-masthead .dek{animation:none;}
+    .back-link, .ledger-masthead h1, .ledger-masthead .dek, .source-tabs{animation:none;}
     .back-link:hover svg{transform:none;}
   }
 </style>
@@ -365,6 +391,7 @@
     <a class="back-link" href="index.html"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Food Court, Tallied</a>
     <h1>Full <em>Ledger</em></h1>
     <p class="dek">Every review ever pulled from Yelp and Google across the food court's six kitchens — search it, filter it, or export it.</p>
+    <div class="source-tabs" id="sourceTabs" role="tablist" aria-label="Browse by review source"></div>
   </header>
 
   <section class="controls" aria-label="Filters">
@@ -373,8 +400,6 @@
       <input type="search" id="search" placeholder="Search review text…" aria-label="Search review text">
     </div>
     <div class="chip-row" id="starChips" role="group" aria-label="Filter by star rating"></div>
-    <div class="chip-divider"></div>
-    <div class="chip-row" id="sourceChips" role="group" aria-label="Filter by review source"></div>
     <div class="chip-divider"></div>
     <div class="chip-row" id="skillChips" role="group" aria-label="Filter by skill category"></div>
     <select id="sortSelect" aria-label="Sort reviews">
@@ -493,6 +518,26 @@ function aggregateByBusiness(rowSet){
 const agg = aggregateByBusiness(DATA);
 const aggAll = aggregateByBusiness(DATA_ALL);
 
+// ---- Yelp vs Google, per business, all-time (Google reviews skew much older than 18 months,
+// so windowing this the same way the rest of the Overview page is windowed would leave several
+// kitchens looking like they have almost no Google presence — see project notes) ----
+function aggregateBySource(rowSet){
+  const out = {};
+  for(const biz of BIZ_ORDER){
+    const rows = rowSet.filter(r=>r.business===biz);
+    const bySource = {};
+    for(const src of ["Yelp","Google"]){
+      const srows = rows.filter(r=>r.source===src);
+      bySource[src] = { avg: srows.length ? srows.reduce((a,r)=>a+r.stars,0)/srows.length : null, count: srows.length };
+    }
+    const avgs = [bySource.Yelp.avg, bySource.Google.avg].filter(v=>v!==null);
+    const combined = avgs.length ? avgs.reduce((a,b)=>a+b,0)/avgs.length : null;
+    out[biz] = { yelp: bySource.Yelp, google: bySource.Google, combined };
+  }
+  return out;
+}
+const sourceCompare = aggregateBySource(DATA_ALL);
+
 // ---- global skill totals ----
 function globalSkillTotals(rowSet){
   const out = {};
@@ -581,10 +626,13 @@ document.getElementById("genDate").textContent = "Compiled " + new Date().toLoca
     `<button class="chip" data-skill="${s}" aria-pressed="false">${s}</button>`
   ).join("");
 
-  const sourceWrap = document.getElementById("sourceChips");
+  const tabWrap = document.getElementById("sourceTabs");
   const sources = [...new Set(DATA_ALL.map(r=>r.source))].sort();
-  sourceWrap.innerHTML = `<button class="chip" data-source="all" aria-pressed="true">All sources</button>` +
-    sources.map(s=>`<button class="chip" data-source="${s}" aria-pressed="false">${s}</button>`).join("");
+  const countFor = s => s==="all" ? DATA_ALL.length : DATA_ALL.filter(r=>r.source===s).length;
+  const tabs = ["all", ...sources];
+  tabWrap.innerHTML = tabs.map(s=>
+    `<button class="source-tab" data-source="${s}" role="tab" aria-selected="${s==="all"}">${s==="all"?"All reviews":s}<span class="source-tab-count">${countFor(s)}</span></button>`
+  ).join("");
 })();
 
 // ---- state ----
@@ -680,10 +728,10 @@ document.getElementById("starChips").addEventListener("click", (e)=>{
   [...btn.parentElement.children].forEach(c=>c.setAttribute("aria-pressed", c===btn ? "true":"false"));
   renderLedger();
 });
-document.getElementById("sourceChips").addEventListener("click", (e)=>{
-  const btn = e.target.closest(".chip"); if(!btn) return;
+document.getElementById("sourceTabs").addEventListener("click", (e)=>{
+  const btn = e.target.closest(".source-tab"); if(!btn) return;
   state.source = btn.dataset.source; state.visible = 40;
-  [...btn.parentElement.children].forEach(c=>c.setAttribute("aria-pressed", c===btn ? "true":"false"));
+  [...btn.parentElement.children].forEach(c=>c.setAttribute("aria-selected", c===btn ? "true":"false"));
   renderLedger();
 });
 document.getElementById("skillChips").addEventListener("click", (e)=>{
