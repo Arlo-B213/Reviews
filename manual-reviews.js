@@ -25,8 +25,11 @@ window.ManualReviews = (function(){
     try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || []; } catch(e){ return []; }
   }
   function writeCache(list){
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify(list)); } catch(e){}
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(list)); return; } catch(e){}
+    // Storage full: keep the text of the reviews rather than nothing.
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(list.map(m => ({ ...m, photos:[] })))); } catch(e){}
   }
+  const sigOf = list => list.map(m => m.id).join(",");
 
   let dbPromise;
   function db(){
@@ -50,8 +53,16 @@ window.ManualReviews = (function(){
     try {
       const { fs, db:d } = await db();
       const snap = await fs.getDocs(fs.query(fs.collection(d, COLLECTION), fs.orderBy("createdAt")));
-      const list = snap.docs.map(x => ({ id:x.id, ...x.data(), createdAt:undefined }));
-      if(JSON.stringify(list) !== JSON.stringify(readCache())){ writeCache(list); location.reload(); }
+      const list = snap.docs.map(x => { const { createdAt, ...rest } = x.data(); return { id:x.id, ...rest }; });
+      const sig = sigOf(list);
+      if(sig === sigOf(readCache())) return;
+      writeCache(list);
+      // Reload at most once per set of reviews, even if the cache can't be saved.
+      let last = null;
+      try { last = sessionStorage.getItem("reviewsReloadedFor"); } catch(e){}
+      if(last === sig) return;
+      try { sessionStorage.setItem("reviewsReloadedFor", sig); } catch(e){ return; }
+      location.reload();
     } catch(e){ console.warn("Couldn't sync submitted reviews:", e); }
   }
 
