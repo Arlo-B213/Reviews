@@ -29,6 +29,9 @@ window.ManualReviews = (function(){
     // Storage full: keep the text of the reviews rather than nothing.
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(list.map(m => ({ ...m, photos:[] })))); } catch(e){}
   }
+  // The Firestore project is shared with other apps; skip any doc that isn't a complete review.
+  const isReview = m => m && typeof m.business === "string" && typeof m.review === "string"
+    && Number.isInteger(m.stars) && typeof m.date === "string";
   const sigOf = list => list.map(m => m.id).join(",");
 
   let dbPromise;
@@ -41,7 +44,7 @@ window.ManualReviews = (function(){
 
   // Returns review objects in the same shape as DATA_ALL rows.
   function load(){
-    return readCache().map(m => {
+    return readCache().filter(isReview).map(m => {
       const ids = [];
       (m.photos || []).forEach((uri, i) => { const id = m.id + "-" + i; photos[id] = uri; ids.push(id); });
       return { business:m.business, reviewer:m.reviewer, stars:m.stars, date:m.date,
@@ -53,7 +56,7 @@ window.ManualReviews = (function(){
     try {
       const { fs, db:d } = await db();
       const snap = await fs.getDocs(fs.query(fs.collection(d, COLLECTION), fs.orderBy("createdAt")));
-      const list = snap.docs.map(x => { const { createdAt, ...rest } = x.data(); return { id:x.id, ...rest }; });
+      const list = snap.docs.map(x => { const { createdAt, ...rest } = x.data(); return { id:x.id, ...rest }; }).filter(isReview);
       const sig = sigOf(list);
       if(sig === sigOf(readCache())) return;
       writeCache(list);
