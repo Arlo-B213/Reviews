@@ -1,6 +1,77 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    match /adjustments/{id} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['when', 'outlet', 'check', 'amount'])
+                            && request.resource.data.amount is number
+                            && request.resource.data.amount >= 0
+                            && request.resource.data.amount < 10000
+                            && request.resource.data.size() <= 20;
+      allow delete: if true;
+    }
+
+    match /photos/{id} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if request.resource.data.data is string
+                            && request.resource.data.data.size() < 1000000;
+      allow delete: if true;
+    }
+    match /photos/{id} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if request.resource.data.data is string
+                    && request.resource.data.data.size() < 1000000;
+      allow update: if false;
+      allow delete: if true;
+    }
+    match /roster/{id} {
+      allow get, create, update: if id.size() == 40;
+      allow list, delete: if false;
+    }
+
+    // Single hardcoded admin identity for the Leadership Training module.
+    // Only this email can edit another employee's profile. Password/login
+    // resets are NOT handled here — those are done directly in the Firebase
+    // Console by the project owner.
+    function isTrainingAdmin() {
+      return request.auth != null && request.auth.token.email == 'arlo.bedolla@gmail.com';
+    }
+    match /mysteryShopperEvals/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ---- KPI dashboard (existing feature) ----
+    match /kpi_dashboard/{docId} {
+      allow read, write: if true;
+    }
+
+    // ---- Guest Tracker (Cove feedback app) ----
+    match /guest_tracker/{docId} {
+      allow read, write: if true;
+    }
+
+    // ---- Leadership Training ----
+    match /training_profiles/{uid} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && (request.auth.uid == uid || isTrainingAdmin());
+      allow delete: if false;
+    }
+
+    match /training_attempts/{attemptId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /archetype_results/{uid} {
+      allow read, create, update: if request.auth != null && (request.auth.uid == uid || isTrainingAdmin());
+      allow delete: if false;
+    }
+
+    // ---- Food Court Reviews ----
     // Anyone can read and submit reviews; edits and deletes are done by the owner in the console.
     match /reviews/{id} {
       allow read: if true;
@@ -13,6 +84,11 @@ service cloud.firestore {
         && request.resource.data.review is string && request.resource.data.review.size() <= 5000
         && request.resource.data.photos is list && request.resource.data.photos.size() <= 3
         && request.resource.data.createdAt == request.time;
+    }
+
+    // Default deny — anything not explicitly allowed above is blocked.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
