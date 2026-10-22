@@ -2,30 +2,57 @@
 // in this browser's localStorage and merged into DATA_ALL at load. Photos are downscaled
 // to JPEG data URIs so they fit in storage.
 window.ManualReviews = (function(){
-  const KEY = "manualReviews.v1";
-  const MAX_PHOTO_EDGE = 1280;
+  // Shared storage: Cloud Firestore (project soft-skills-f6ae0). Photos are downscaled JPEG data
+  // URIs stored inside the review document, so Firebase Storage (paid plan) isn't needed.
+  // The page's data is built synchronously, so the last fetched list is cached in localStorage;
+  // sync() refreshes it in the background and reloads once if anything changed.
+  const FIREBASE = "https://www.gstatic.com/firebasejs/10.14.1/";
+  const CONFIG = {
+    apiKey:"AIzaSyCs6_YRPZsGDkb4hUFU4uVvfwyN9gPKUDg",
+    authDomain:"soft-skills-f6ae0.firebaseapp.com",
+    projectId:"soft-skills-f6ae0",
+    storageBucket:"soft-skills-f6ae0.firebasestorage.app",
+    messagingSenderId:"25790648095",
+    appId:"1:25790648095:web:3a1ef1946901bd71302a2a"
+  };
+  const CACHE_KEY = "remoteReviews.v1";
+  const COLLECTION = "reviews";
+  const MAX_PHOTOS = 3;
+  const MAX_PHOTO_CHARS = 280000;   // per photo; keeps each document well under Firestore's 1 MiB cap
   const photos = {};   // photo id -> data URI, read by the ledger's photo strip
 
-  function readStore(){
-    try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){ return []; }
+  function readCache(){
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || []; } catch(e){ return []; }
   }
-  function writeStore(list){
-    try { localStorage.setItem(KEY, JSON.stringify(list)); return true; } catch(e){ return false; }
+  function writeCache(list){
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(list)); } catch(e){}
+  }
+
+  let dbPromise;
+  function db(){
+    return dbPromise || (dbPromise = (async () => {
+      const [app, fs] = await Promise.all([import(FIREBASE + "firebase-app.js"), import(FIREBASE + "firebase-firestore.js")]);
+      return { fs, db: fs.getFirestore(app.initializeApp(CONFIG)) };
+    })());
   }
 
   // Returns review objects in the same shape as DATA_ALL rows.
   function load(){
-    return readStore().map(m => {
+    return readCache().map(m => {
       const ids = [];
       (m.photos || []).forEach((uri, i) => { const id = m.id + "-" + i; photos[id] = uri; ids.push(id); });
       return { business:m.business, reviewer:m.reviewer, stars:m.stars, date:m.date,
-               review:m.review, photos:ids, source:"Manual", _manualId:m.id };
+               review:m.review, photos:ids, source:"Submitted" };
     });
   }
 
-  function remove(id){
-    writeStore(readStore().filter(m => m.id !== id));
-    location.reload();
+  async function sync(){
+    try {
+      const { fs, db:d } = await db();
+      const snap = await fs.getDocs(fs.query(fs.collection(d, COLLECTION), fs.orderBy("createdAt")));
+      const list = snap.docs.map(x => ({ id:x.id, ...x.data(), createdAt:undefined }));
+      if(JSON.stringify(list) !== JSON.stringify(readCache())){ writeCache(list); location.reload(); }
+    } catch(e){ console.warn("Couldn't sync submitted reviews:", e); }
   }
 
   function shrink(file){
@@ -33,12 +60,17 @@ window.ManualReviews = (function(){
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
-        const scale = Math.min(1, MAX_PHOTO_EDGE / Math.max(img.width, img.height));
-        const c = document.createElement("canvas");
-        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
-        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
-        resolve(c.toDataURL("image/jpeg", 0.8));
+        let edge = 1100, q = 0.75;
+        for(;;){
+          const scale = Math.min(1, edge / Math.max(img.width, img.height));
+          const c = document.createElement("canvas");
+          c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          const uri = c.toDataURL("image/jpeg", q);
+          if(uri.length <= MAX_PHOTO_CHARS || edge < 300) return resolve(uri);
+          edge = Math.round(edge * 0.8); q = Math.max(0.5, q - 0.05);
+        }
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Couldn't read " + file.name)); };
       img.src = url;
@@ -60,7 +92,6 @@ window.ManualReviews = (function(){
     .mr-thumbs img{width:56px; height:56px; object-fit:cover; border-radius:6px; border:1px solid var(--line);}
     .mr-actions{display:flex; justify-content:flex-end; gap:8px;}
     .mr-err{color:var(--critical); font-size:13px; margin:0;}
-    .mr-del{margin-top:8px; font-size:11px;}
   `;
 
   function mount(options){
@@ -86,7 +117,7 @@ window.ManualReviews = (function(){
           </select>
         </label>
         <label>Review <textarea name="review" required maxlength="5000"></textarea></label>
-        <label>Photos (optional) <input name="photos" type="file" accept="image/*" multiple></label>
+        <label>Photos (optional, up to 3) <input name="photos" type="file" accept="image/*" multiple></label>
         <div class="mr-thumbs"></div>
         <p class="mr-err" hidden></p>
         <div class="mr-actions">
@@ -98,12 +129,15 @@ window.ManualReviews = (function(){
 
     const form = dlg.querySelector("form");
     const err = dlg.querySelector(".mr-err");
+    const submit = dlg.querySelector("[type=submit]");
     const thumbs = dlg.querySelector(".mr-thumbs");
     const today = new Date().toISOString().slice(0, 10);
     form.date.value = today; form.date.max = today;
 
     form.photos.addEventListener("change", () => {
       thumbs.innerHTML = "";
+      if(form.photos.files.length > MAX_PHOTOS){ form.photos.value = ""; err.textContent = "Up to " + MAX_PHOTOS + " photos per review."; err.hidden = false; return; }
+      err.hidden = true;
       [...form.photos.files].forEach(f => {
         const im = document.createElement("img"); im.src = URL.createObjectURL(f); im.alt = ""; thumbs.appendChild(im);
       });
@@ -116,14 +150,16 @@ window.ManualReviews = (function(){
       const fail = msg => { err.textContent = msg; err.hidden = false; };
       const reviewer = form.reviewer.value.trim(), review = form.review.value.trim();
       if(!reviewer || !review || !form.date.value) return fail("Name, date and review text are required.");
+      submit.disabled = true;
       let uris;
       try { uris = await Promise.all([...form.photos.files].map(shrink)); }
-      catch(ex){ return fail(ex.message); }
-      const list = readStore();
-      list.push({ id:"manual-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-                  business:form.business.value, reviewer, stars:Number(form.stars.value),
-                  date:form.date.value, review, photos:uris });
-      if(!writeStore(list)) return fail("Browser storage is full — try fewer or smaller photos.");
+      catch(ex){ submit.disabled = false; return fail(ex.message); }
+      try {
+        const { fs, db:d } = await db();
+        await fs.addDoc(fs.collection(d, COLLECTION), {
+          business:form.business.value, reviewer, stars:Number(form.stars.value),
+          date:form.date.value, review, photos:uris, createdAt:fs.serverTimestamp() });
+      } catch(ex){ submit.disabled = false; return fail("Couldn't save the review: " + ex.message); }
       location.reload();
     });
 
@@ -133,5 +169,5 @@ window.ManualReviews = (function(){
     options.buttonParent.insertBefore(btn, options.buttonParent.firstChild);
   }
 
-  return { load, remove, mount, photos };
+  return { load, sync, mount, photos };
 })();
